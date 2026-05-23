@@ -43,6 +43,8 @@ type Action =
   | { type: 'DELETE_SCORING_RULE'; id: string }
   | { type: 'UPDATE_SCORING_RULE'; id: string; patch: Partial<ScoringRule> }
   | { type: 'SET_JSON'; raw: string }
+  | { type: 'REPLACE_STEPS'; steps: Step[] }
+  | { type: 'REPLACE_PRICING'; rules: PricingRule[] }
   | { type: 'SET_SAVING'; value: boolean }
   | { type: 'SET_PUBLISHING'; value: boolean }
   | { type: 'SAVED' }
@@ -200,6 +202,10 @@ function reducer(state: BuilderState, action: Action): BuilderState {
       }
     }
 
+    case 'REPLACE_STEPS':
+      return dirty({ ...state, schema: { ...state.schema, steps: action.steps }, selectedStepIdx: 0, selectedFieldId: null });
+    case 'REPLACE_PRICING':
+      return dirty({ ...state, schema: { ...state.schema, pricing: action.rules } });
     case 'SET_SAVING':    return { ...state, saving: action.value };
     case 'SET_PUBLISHING':return { ...state, publishing: action.value };
     case 'SAVED':         return { ...state, dirty: false, saving: false, saveError: null };
@@ -903,14 +909,10 @@ function SimplePricingSection({ rules, allFields, dispatch }: {
 }) {
   const kindOpts: PricingRule['kind'][] = ['base', 'add', 'multiply', 'discount', 'vat'];
   return (
-    <section style={{ marginTop: 40, paddingTop: 32, borderTop: '1px solid var(--color-line)' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 16 }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-muted)' }}>€</span>
-        <h2 style={{ fontSize: 18, fontWeight: 500, letterSpacing: '-0.015em', margin: 0 }}>Cennik</h2>
-      </div>
+    <section>
       <div style={{ marginLeft: 32, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {rules.length === 0 && (
-          <div style={{ padding: '10px 0', fontSize: 13, color: 'var(--color-muted)', fontStyle: 'italic' }}>Brez cenovnih pravil.</div>
+          <div style={{ padding: '10px 0', fontSize: 13, color: 'var(--color-muted)', fontStyle: 'italic' }}>Brez cenovnih pravil — uporabi nastavitve zgoraj ali dodaj ročno.</div>
         )}
         {rules.map(rule => (
           <div key={rule.id} style={{ padding: '12px 14px', background: '#fff', border: '1px solid var(--color-line)', borderRadius: 'var(--radius-2)', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -972,9 +974,22 @@ function SimpleModeView({ state, dispatch, configuratorStatus }: {
   state: BuilderState; dispatch: React.Dispatch<Action>; configuratorStatus: string;
 }) {
   const allFields = state.schema.steps.flatMap(s => s.fields);
+  const [showPergola, setShowPergola] = useState(true);
+  const [showPricingTool, setShowPricingTool] = useState(true);
   return (
     <div style={{ flex: 1, overflowY: 'auto' as const, background: '#fff' }}>
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '32px 32px 100px' }}>
+        {/* Pergola tool */}
+        {showPergola ? (
+          <div style={{ marginBottom: 24 }}>
+            <PergolaTool state={state} dispatch={dispatch} onClose={() => setShowPergola(false)} />
+          </div>
+        ) : (
+          <button onClick={() => setShowPergola(true)}
+            style={{ marginBottom: 20, fontSize: 11.5, color: 'var(--color-text-3)', background: 'var(--color-surface)', border: '1px solid var(--color-line)', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
+            ⚙ Pergola nastavitve
+          </button>
+        )}
         {/* Product title */}
         <div style={{ paddingBottom: 24, borderBottom: '1px solid var(--color-line)', marginBottom: 8 }}>
           <div style={{ fontSize: 10.5, color: 'var(--color-muted)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: 6 }}>
@@ -1016,7 +1031,24 @@ function SimpleModeView({ state, dispatch, configuratorStatus }: {
           </button>
         </div>
 
-        {/* Pricing */}
+        {/* Pricing tool */}
+        <div style={{ marginTop: 40, paddingTop: 32, borderTop: '1px solid var(--color-line)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 12 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-muted)' }}>€</span>
+            <h2 style={{ fontSize: 18, fontWeight: 500, letterSpacing: '-0.015em', margin: 0 }}>Cennik</h2>
+            <button onClick={() => setShowPricingTool(v => !v)}
+              style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--color-text-3)', background: 'var(--color-surface)', border: '1px solid var(--color-line)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontFamily: 'inherit' }}>
+              {showPricingTool ? 'Skrij nastavitve' : '⚙ Cenik nastavitve'}
+            </button>
+          </div>
+          {showPricingTool && (
+            <div style={{ marginBottom: 20 }}>
+              <PergolaPricingTool state={state} dispatch={dispatch} />
+            </div>
+          )}
+        </div>
+
+        {/* Pricing rules (manual edit) */}
         <SimplePricingSection rules={state.schema.pricing} allFields={allFields} dispatch={dispatch} />
 
         {/* Advanced note */}
@@ -1029,6 +1061,465 @@ function SimpleModeView({ state, dispatch, configuratorStatus }: {
             Preklopite na "Napredno" pogled z gumbom spodaj desno za dostop do naprednega urejevalnika.
           </p>
         </details>
+      </div>
+    </div>
+  );
+}
+
+// ── Pergola Setup Tool ─────────────────────────────────────────────────────
+
+interface DimConfig {
+  mode: 'slider' | 'preset';
+  min: number; max: number; def: number;
+  presets: number[];
+}
+
+interface PToolCfg {
+  width: DimConfig;
+  depth: DimConfig;
+  height: DimConfig;
+}
+
+function dimField(id: string, label: string, dim: DimConfig): Field {
+  if (dim.mode === 'preset' && dim.presets.length > 0) {
+    return {
+      id, type: 'radio', label, required: false,
+      options: dim.presets.map(v => ({
+        id: String(v),
+        label: `${(v / 100).toFixed(2).replace(/\.?0+$/, '')} m`,
+      })),
+      default: String(dim.presets[0]),
+    } as Field;
+  }
+  return { id, type: 'number-slider', label, min: dim.min, max: dim.max, step: 10, default: dim.def, unit: 'cm', required: false } as Field;
+}
+
+const ENC_OPTIONS: Option[] = [
+  { id: 'none',               label: 'Brez' },
+  { id: 'zip-screen',         label: 'Zip screen' },
+  { id: 'movable-slats',      label: 'Premične lamele' },
+  { id: 'sliding-glass',      label: 'Drsno steklo' },
+  { id: 'fixed-glass',        label: 'Fiksno steklo' },
+  { id: 'ventilation-panel',  label: 'Prezračevalna plošča' },
+  { id: 'metal-panel',        label: 'Kovinska plošča' },
+];
+
+const COLOR_OPTIONS: SwatchOption[] = [
+  { id: '#383E42', label: 'Antracit',   color: '#383E42' },
+  { id: '#5a5a5a', label: 'Temno siva', color: '#5a5a5a' },
+  { id: '#8a8a8a', label: 'Srebrna',    color: '#8a8a8a' },
+  { id: '#f0f0f0', label: 'Bela',       color: '#f0f0f0' },
+  { id: '#6B4A2E', label: 'Les',        color: '#6B4A2E' },
+];
+
+function buildPergolaSteps(feat: {
+  dimensions: boolean; roof: boolean; installation: boolean;
+  posts: boolean; enclosures: boolean; colors: boolean;
+  contact: boolean; notes: boolean;
+}, cfg: PToolCfg): Step[] {
+  const steps: Step[] = [];
+
+  if (feat.dimensions) {
+    steps.push({
+      id: 'dimenzije', label: 'Dimenzije', fields: [
+        dimField('width',  'Širina',  cfg.width),
+        dimField('depth',  'Globina', cfg.depth),
+        dimField('height', 'Višina',  cfg.height),
+      ],
+    });
+  }
+
+  if (feat.roof) {
+    steps.push({
+      id: 'streha', label: 'Streha', fields: [
+        { id: 'slats_type', type: 'radio', label: 'Tip lamel', required: false,
+          options: [{ id: 'flat', label: 'Ravne lamele' }, { id: 'wavy', label: 'Valovite lamele' }],
+          default: 'flat', columns: 2 } as Field,
+        { id: 'lamelle_angle', type: 'number-slider', label: 'Odprtost lamel', min: 0, max: 90, step: 5, default: 0, unit: '°', required: false } as Field,
+      ],
+    });
+  }
+
+  if (feat.installation) {
+    steps.push({
+      id: 'montaza', label: 'Montaža', fields: [
+        { id: 'house_wall_back',  type: 'checkbox', label: 'Pritrditev na hišo — zadaj', required: false } as Field,
+        { id: 'house_wall_left',  type: 'checkbox', label: 'Pritrditev na hišo — levo',  required: false } as Field,
+        { id: 'house_wall_right', type: 'checkbox', label: 'Pritrditev na hišo — desno', required: false } as Field,
+        { id: 'house_wall_front', type: 'checkbox', label: 'Pritrditev na hišo — spredaj', required: false } as Field,
+      ],
+    });
+  }
+
+  if (feat.posts) {
+    const pf = (id: string, label: string, offId: string) => ([
+      { id, type: 'checkbox', label, required: false } as Field,
+      { id: offId, type: 'number-slider', label: `Odmik — ${label.toLowerCase()}`, min: -200, max: 200, step: 10, default: 0, unit: 'cm', required: false,
+        visibleIf: { eq: [`$${id}` as `$${string}`, true] } } as Field,
+    ]);
+    steps.push({
+      id: 'stebri', label: 'Dodatni stebri', fields: [
+        ...pf('post_front', 'Dodaten steber spredaj',  'post_front_offset'),
+        ...pf('post_rear',  'Dodaten steber zadaj',   'post_rear_offset'),
+        ...pf('post_left',  'Dodaten steber levo',    'post_left_offset'),
+        ...pf('post_right', 'Dodaten steber desno',   'post_right_offset'),
+      ],
+    });
+  }
+
+  if (feat.enclosures) {
+    steps.push({
+      id: 'stranice', label: 'Stranice', fields: [
+        { id: 'enc_front_type', type: 'select', label: 'Stranica spredaj', required: false, options: ENC_OPTIONS, default: 'none' } as Field,
+        { id: 'enc_back_type',  type: 'select', label: 'Stranica zadaj',   required: false, options: ENC_OPTIONS, default: 'none' } as Field,
+        { id: 'enc_left_type',  type: 'select', label: 'Stranica levo',    required: false, options: ENC_OPTIONS, default: 'none' } as Field,
+        { id: 'enc_right_type', type: 'select', label: 'Stranica desno',   required: false, options: ENC_OPTIONS, default: 'none' } as Field,
+      ],
+    });
+  }
+
+  if (feat.colors) {
+    steps.push({
+      id: 'barve', label: 'Barve', fields: [
+        { id: 'structure_color', type: 'swatch', label: 'Barva okvirja', required: false, options: COLOR_OPTIONS, default: '#383E42' } as Field,
+        { id: 'slats_color',     type: 'swatch', label: 'Barva lamel',   required: false, options: COLOR_OPTIONS, default: '#383E42' } as Field,
+      ],
+    });
+  }
+
+  if (feat.contact) {
+    const fields: Field[] = [
+      { id: 'name',  type: 'text',  label: 'Ime in priimek', required: true },
+      { id: 'email', type: 'email', label: 'E-pošta',        required: true },
+      { id: 'phone', type: 'phone', label: 'Telefon',        required: false },
+    ];
+    if (feat.notes) {
+      fields.push({ id: 'notes', type: 'text', label: 'Opombe (posebne zahteve)', required: false });
+    }
+    steps.push({ id: 'kontakt', label: 'Kontakt', fields });
+  }
+
+  return steps;
+}
+
+// Defined at module level so React never remounts them on parent re-render
+function PToolToggle({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', flexShrink: 0,
+        background: on ? '#0a0a0a' : '#d4d4d4', position: 'relative', transition: 'background .15s', padding: 0,
+      }}
+    >
+      <div style={{
+        width: 18, height: 18, borderRadius: 9, background: '#fff',
+        position: 'absolute', top: 2, left: on ? 20 : 2, transition: 'left .15s',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+      }} />
+    </button>
+  );
+}
+
+function PToolDimRow({ label, dimKey, cfg, onChange }: {
+  label: string;
+  dimKey: 'width' | 'depth' | 'height';
+  cfg: PToolCfg;
+  onChange: (k: 'width' | 'depth' | 'height', v: DimConfig) => void;
+}) {
+  const dim = cfg[dimKey];
+  const [newVal, setNewVal] = useState('');
+
+  const inp: React.CSSProperties = {
+    width: 72, border: '1px solid var(--color-line-2)', borderRadius: 4,
+    padding: '5px 8px', fontSize: 13, fontFamily: 'var(--font-mono)',
+    outline: 'none', background: '#fff', boxSizing: 'border-box' as const, textAlign: 'center' as const,
+  };
+
+  function addPreset() {
+    const v = parseInt(newVal, 10);
+    if (v > 0 && !dim.presets.includes(v)) {
+      onChange(dimKey, { ...dim, presets: [...dim.presets, v].sort((a, b) => a - b) });
+      setNewVal('');
+    }
+  }
+
+  return (
+    <div style={{ paddingLeft: 50, marginTop: 10, paddingBottom: 10, borderBottom: '1px solid var(--color-line-2)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <span style={{ fontSize: 12.5, color: 'var(--color-text-3)', width: 60 }}>{label}</span>
+        <div style={{ display: 'inline-flex', background: 'var(--color-surface)', border: '1px solid var(--color-line)', borderRadius: 4, overflow: 'hidden' }}>
+          {(['slider', 'preset'] as const).map(m => (
+            <button key={m} type="button"
+              onClick={() => onChange(dimKey, { ...dim, mode: m })}
+              style={{
+                padding: '3px 10px', fontSize: 11, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                background: dim.mode === m ? '#0a0a0a' : 'transparent',
+                color: dim.mode === m ? '#fff' : 'var(--color-text-3)',
+              }}>
+              {m === 'slider' ? 'Slider' : 'Preseti'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {dim.mode === 'slider' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 1fr 1fr', gap: 10 }}>
+          <span />
+          {([['Min', 'min'], ['Max', 'max'], ['Privzeto', 'def']] as [string, keyof DimConfig][]).map(([lbl, k]) => (
+            <label key={k} style={{ display: 'flex', flexDirection: 'column' as const, gap: 2 }}>
+              <span style={{ fontSize: 10.5, color: 'var(--color-muted)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>{lbl} cm</span>
+              <input type="number" value={dim[k] as number}
+                onChange={e => onChange(dimKey, { ...dim, [k]: parseInt(e.target.value, 10) || 0 })}
+                style={inp} />
+            </label>
+          ))}
+        </div>
+      )}
+
+      {dim.mode === 'preset' && (
+        <div>
+          <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6, marginBottom: 8 }}>
+            {dim.presets.length === 0 && (
+              <span style={{ fontSize: 12, color: 'var(--color-muted)', fontStyle: 'italic' }}>Brez presetov — dodaj spodaj.</span>
+            )}
+            {dim.presets.map((v, i) => (
+              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 6px 3px 8px', background: '#fff', border: '1px solid var(--color-line)', borderRadius: 4, fontSize: 12.5, fontFamily: 'var(--font-mono)' }}>
+                {v} cm
+                <button type="button"
+                  onClick={() => onChange(dimKey, { ...dim, presets: dim.presets.filter((_, j) => j !== i) })}
+                  style={{ all: 'unset' as const, cursor: 'pointer', color: 'var(--color-muted)', fontSize: 14, lineHeight: 1, paddingLeft: 2 }}>×</button>
+              </span>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input type="number" placeholder="npr. 300"
+              value={newVal}
+              onChange={e => setNewVal(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addPreset(); } }}
+              style={{ ...inp, width: 90 }} />
+            <button type="button" onClick={addPreset}
+              style={{ height: 30, padding: '0 10px', background: '#0a0a0a', color: '#fff', border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+              + Dodaj
+            </button>
+            <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>cm</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PergolaTool({ state, dispatch, onClose }: {
+  state: BuilderState; dispatch: React.Dispatch<Action>; onClose: () => void;
+}) {
+  const allIds = new Set(state.schema.steps.flatMap(s => s.fields.map(f => f.id)));
+  const existingWidth = state.schema.steps.flatMap(s => s.fields).find(f => f.id === 'width') as (Field & { min?: number; max?: number; default?: number }) | undefined;
+
+  const [feat, setFeat] = useState({
+    dimensions:   true,
+    roof:         true,
+    installation: true,
+    posts:        true,
+    enclosures:   true,
+    colors:       true,
+    contact:      true,
+    notes:        allIds.has('notes'),
+  });
+
+  const [cfg, setCfg] = useState<PToolCfg>({
+    width:  { mode: 'slider', min: existingWidth?.min ?? 200, max: existingWidth?.max ?? 600, def: existingWidth?.default ?? 400, presets: [] },
+    depth:  { mode: 'slider', min: 200, max: 500, def: 300, presets: [] },
+    height: { mode: 'slider', min: 220, max: 320, def: 250, presets: [] },
+  });
+
+  const [flash, setFlash] = useState(false);
+
+  function apply() {
+    const steps = buildPergolaSteps(feat, cfg);
+    dispatch({ type: 'REPLACE_STEPS', steps });
+    setFlash(true);
+    setTimeout(() => setFlash(false), 1500);
+  }
+
+  const tog   = (k: keyof typeof feat) => setFeat(f => ({ ...f, [k]: !f[k] }));
+  const onDim = (k: 'width' | 'depth' | 'height', v: DimConfig) => setCfg(c => ({ ...c, [k]: v }));
+
+  const row = (label: string, k: keyof typeof feat, sub?: React.ReactNode) => (
+    <div key={k} style={{ padding: '10px 0', borderBottom: '1px solid var(--color-line)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }} onClick={() => tog(k)}>
+        <PToolToggle on={feat[k]} onClick={() => tog(k)} />
+        <span style={{ fontSize: 13.5, fontWeight: 500, color: feat[k] ? 'var(--color-ink)' : 'var(--color-text-3)', userSelect: 'none' }}>{label}</span>
+      </div>
+      {feat[k] && sub && <div style={{ marginTop: 6 }}>{sub}</div>}
+    </div>
+  );
+
+  return (
+    <div style={{ background: '#f8f9fa', border: '1px solid var(--color-line)', borderRadius: 'var(--radius-2)', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--color-line)', background: '#fff' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-2)', letterSpacing: '0.06em', textTransform: 'uppercase' as const, fontFamily: 'var(--font-mono)' }}>
+          ⬡ Pergola konfigurator
+        </span>
+        <div style={{ flex: 1 }} />
+        <button onClick={onClose} style={{ ...S.iconBtn, fontSize: 16 }}>×</button>
+      </div>
+
+      <div style={{ padding: '0 16px' }}>
+        {row('Dimenzije — širina, globina, višina', 'dimensions',
+          <>
+            <PToolDimRow label="Širina"  dimKey="width"  cfg={cfg} onChange={onDim} />
+            <PToolDimRow label="Globina" dimKey="depth"  cfg={cfg} onChange={onDim} />
+            <PToolDimRow label="Višina"  dimKey="height" cfg={cfg} onChange={onDim} />
+          </>
+        )}
+        {row('Streha — tip lamel + kot odprtosti', 'roof')}
+        {row('Montaža — pritrditev na hišo (po straneh)', 'installation')}
+        {row('Dodatni stebri — po straneh z odmikom', 'posts')}
+        {row('Stranice — vrsta zapore po straneh', 'enclosures')}
+        {row('Barve — okvir in lamele ločeno', 'colors')}
+        {row('Kontakt — ime, e-pošta, telefon', 'contact')}
+        {feat.contact && row('Opomba stranke (posebne zahteve)', 'notes')}
+      </div>
+
+      <div style={{ padding: '14px 16px', background: '#fff', borderTop: '1px solid var(--color-line)', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button onClick={apply} style={{
+          height: 36, padding: '0 20px', background: flash ? '#16a34a' : '#0a0a0a', color: '#fff',
+          border: 'none', borderRadius: 'var(--radius-2)', fontSize: 13, fontWeight: 500,
+          cursor: 'pointer', fontFamily: 'inherit', transition: 'background .2s', flexShrink: 0,
+        }}>
+          {flash ? '✓ Posodobljeno!' : 'Posodobi konfigurator →'}
+        </button>
+        <span style={{ fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.4 }}>Prepiše korake · cenik se ohrani</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Pergola Pricing Tool ──────────────────────────────────────────────────
+
+interface PPriceCfg {
+  base: number;
+  sqm: number;
+  post: number;
+  side: number;
+  vat: number;
+}
+
+function PergolaPricingTool({ state, dispatch }: {
+  state: BuilderState; dispatch: React.Dispatch<Action>;
+}) {
+  const existing = state.schema.pricing;
+  const existingBase = existing.find(r => r.kind === 'base');
+  const existingVat  = existing.find(r => r.kind === 'vat');
+
+  const [cfg, setCfg] = useState<PPriceCfg>({
+    base: typeof existingBase?.formula === 'number' ? existingBase.formula : 0,
+    sqm:  0,
+    post: 0,
+    side: 0,
+    vat:  existingVat ? Math.round(existingVat.rate * 100) : 22,
+  });
+  const [flash, setFlash] = useState(false);
+
+  const sideFields = state.schema.steps.flatMap(s => s.fields).filter(f =>
+    f.id.startsWith('enc_') && f.id.endsWith('_type')
+  );
+
+  function apply() {
+    const rules: PricingRule[] = [];
+
+    rules.push({ id: uid(), kind: 'base', formula: cfg.base, label: 'Osnovna cena' });
+
+    if (cfg.sqm > 0) {
+      rules.push({
+        id: uid(), kind: 'add',
+        when: { gte: ['$width' as `$${string}`, 0] },
+        formula: { times: [{ div: [{ area: { width: '$width' as `$${string}`, depth: '$depth' as `$${string}` } }, 10000] }, cfg.sqm] },
+        label: `Cena za m² (${cfg.sqm} €/m²)`,
+      });
+    }
+
+    if (cfg.post > 0) {
+      rules.push({
+        id: uid(), kind: 'add',
+        when: { gte: ['$extra_posts_w' as `$${string}`, 1] },
+        formula: { times: [{ ref: '$extra_posts_w' as `$${string}` }, cfg.post] },
+        label: `Cena za steber (${cfg.post} €/kos)`,
+      });
+    }
+
+    if (cfg.side > 0) {
+      for (const f of sideFields) {
+        rules.push({
+          id: uid(), kind: 'add',
+          when: { neq: [`$${f.id}` as `$${string}`, 'none'] },
+          formula: cfg.side,
+          label: `${f.label} (${cfg.side} €)`,
+        });
+      }
+    }
+
+    if (cfg.vat > 0) {
+      rules.push({ id: uid(), kind: 'vat', rate: cfg.vat / 100, label: `DDV (${cfg.vat}%)` });
+    }
+
+    dispatch({ type: 'REPLACE_PRICING', rules });
+    setFlash(true);
+    setTimeout(() => setFlash(false), 1500);
+  }
+
+  const onNum = (k: keyof PPriceCfg, v: string) => setCfg(c => ({ ...c, [k]: parseFloat(v) || 0 }));
+
+  const inp: React.CSSProperties = {
+    width: 90, border: '1px solid var(--color-line-2)', borderRadius: 4,
+    padding: '5px 8px', fontSize: 13, fontFamily: 'var(--font-mono)',
+    outline: 'none', background: '#fff', boxSizing: 'border-box' as const, textAlign: 'right' as const,
+  };
+
+  const priceRow = (label: string, k: keyof PPriceCfg, unit: string, hint?: string) => (
+    <div key={k} style={{ display: 'grid', gridTemplateColumns: '160px 1fr', alignItems: 'start', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--color-line)' }}>
+      <div>
+        <div style={{ fontSize: 13, color: 'var(--color-text-2)' }}>{label}</div>
+        {hint && <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 1 }}>{hint}</div>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input type="number" min={0} value={cfg[k]} onChange={e => onNum(k, e.target.value)} style={inp} />
+        <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{unit}</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ background: '#f8f9fa', border: '1px solid var(--color-line)', borderRadius: 'var(--radius-2)', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--color-line)', background: '#fff' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-2)', letterSpacing: '0.06em', textTransform: 'uppercase' as const, fontFamily: 'var(--font-mono)' }}>
+          € Cenik — nastavitve
+        </span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Prepiše cenovna pravila</span>
+      </div>
+      <div style={{ padding: '0 16px' }}>
+        {priceRow('Osnovna cena', 'base', '€')}
+        {priceRow('Cena za m²', 'sqm', '€/m²', 'širina × globina ÷ 10000')}
+        {priceRow('Cena za steber', 'post', '€/kos', 'extra_posts_w × cena')}
+        {priceRow('Cena za stranico', 'side', '€', 'vsaka vklopljena stranica')}
+        {priceRow('DDV', 'vat', '%')}
+      </div>
+      {sideFields.length === 0 && cfg.side > 0 && (
+        <div style={{ margin: '0 16px 8px', fontSize: 11.5, color: '#92400e', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 4, padding: '6px 10px' }}>
+          Najprej posodobi konfigurator (zgoraj) in vključi &ldquo;Stranice&rdquo;, da se dodajo polja za zapore.
+        </div>
+      )}
+      <div style={{ padding: '14px 16px', background: '#fff', borderTop: '1px solid var(--color-line)', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button onClick={apply} style={{
+          height: 36, padding: '0 20px', background: flash ? '#16a34a' : '#0a0a0a', color: '#fff',
+          border: 'none', borderRadius: 'var(--radius-2)', fontSize: 13, fontWeight: 500,
+          cursor: 'pointer', fontFamily: 'inherit', transition: 'background .2s', flexShrink: 0,
+        }}>
+          {flash ? '✓ Cenik posodobljen!' : 'Posodobi cenik →'}
+        </button>
       </div>
     </div>
   );
@@ -1087,6 +1578,16 @@ export function BuilderClient({
   const [showGuide, setShowGuide] = useState(() => initialSchema.steps.length === 0);
   const [upgradeInfo, setUpgradeInfo] = useState<{ message: string; limit: number } | null>(null);
   const [simpleMode, setSimpleMode] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewKey, setPreviewKey] = useState(0);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const shareUrl = `https://forma.gudweb.si/i/${configuratorId}`;
+
+  function copyLink() {
+    navigator.clipboard?.writeText(shareUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  }
 
   const allFields = state.schema.steps.flatMap(s => s.fields);
   const selectedStep = state.schema.steps[state.selectedStepIdx];
@@ -1177,6 +1678,27 @@ export function BuilderClient({
         )}
 
         <div style={{ flex: 1 }} />
+        <button
+          onClick={copyLink}
+          style={{ fontSize: 12, color: copiedLink ? '#16a34a' : 'var(--color-text-3)', background: 'none', border: '1px solid var(--color-line)', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', transition: 'color .15s', flexShrink: 0 }}
+        >
+          {copiedLink ? '✓ Kopirano!' : 'Kopiraj link'}
+        </button>
+        <a
+          href={shareUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ fontSize: 12, color: 'var(--color-text-3)', textDecoration: 'none', border: '1px solid var(--color-line)', borderRadius: 4, padding: '4px 10px', lineHeight: '1.6', flexShrink: 0 }}
+        >
+          ↗ Odpri
+        </a>
+        <button
+          onClick={() => setShowPreview(v => !v)}
+          style={{ fontSize: 12, color: showPreview ? 'var(--color-ink)' : 'var(--color-text-3)', background: showPreview ? 'var(--color-surface-2)' : 'none', border: '1px solid var(--color-line)', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+        >
+          {showPreview ? '✕ Zapri' : '▣ Predogled'}
+        </button>
+        <div style={{ width: 1, height: 20, background: 'var(--color-line)', flexShrink: 0 }} />
         {state.saveError && <span style={{ fontSize: 12, color: '#ef4444' }}>{state.saveError}</span>}
         <Btn variant="secondary" size="sm" onClick={handleSave} disabled={state.saving || !state.dirty}>
           {state.saving && !state.publishing ? 'Saving…' : state.dirty ? 'Save draft' : 'Saved'}
@@ -1185,6 +1707,10 @@ export function BuilderClient({
           {state.publishing ? 'Publishing…' : 'Publish'}
         </Btn>
       </div>
+
+      {/* Content row: editor + optional live preview pane */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
       {/* Simple mode */}
       {simpleMode && (
@@ -1377,6 +1903,40 @@ export function BuilderClient({
           />
         </div>
       )}
+
+        </div>{/* end editor column */}
+
+        {/* Live preview pane */}
+        {showPreview && (
+          <div style={{ width: 420, flexShrink: 0, borderLeft: '1px solid var(--color-line)', display: 'flex', flexDirection: 'column', background: 'var(--color-surface)' }}>
+            <div style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', borderBottom: '1px solid var(--color-line)', background: '#fff', flexShrink: 0 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-2)' }}>Predogled</span>
+              <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>· nazadnje shranjena verzija</span>
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={async () => { await handleSave(); setPreviewKey(k => k + 1); }}
+                style={{ fontSize: 11.5, color: 'var(--color-text-3)', background: 'none', border: '1px solid var(--color-line)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                ↺ Osveži
+              </button>
+              <a
+                href={shareUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: 11.5, color: 'var(--color-text-3)', textDecoration: 'none', border: '1px solid var(--color-line)', borderRadius: 4, padding: '3px 8px', lineHeight: '1.6' }}
+              >
+                ↗ Odpri
+              </a>
+            </div>
+            <iframe
+              key={previewKey}
+              src={`/i/${configuratorId}?preview=1`}
+              style={{ flex: 1, border: 'none', width: '100%' }}
+              title="Predogled konfiguratora"
+            />
+          </div>
+        )}
+      </div>{/* end content row */}
 
       {/* Mode toggle pill */}
       <ModePill mode={simpleMode ? 'simple' : 'advanced'} onChange={m => setSimpleMode(m === 'simple')} />

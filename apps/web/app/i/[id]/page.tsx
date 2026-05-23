@@ -1,8 +1,83 @@
 'use client';
 
-import { use, useEffect, useState, useCallback, useRef } from 'react';
+import { use, useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { evaluate } from '@forma/configurator-engine';
 import type { ConfiguratorSchema, Field, Step, EvaluateResult } from '@forma/types';
+import type { PergolaConfig, EnclosureType, EnclosureSegment } from '@/components/Pergola3D';
+
+const Pergola3D = dynamic(
+  () => import('@/components/Pergola3D').then(m => ({ default: m.Pergola3D })),
+  { ssr: false, loading: () => <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(175deg,#e8edf2,#d6dde6)' }}><div style={{ width: 28, height: 28, border: '2px solid #c8d0d8', borderTopColor: '#5a7a8a', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /></div> }
+);
+
+const PERGOLA_3D_IDS = new Set([
+  'width','sirina','širina','depth','globina','height','visina','višina',
+  'color','barva','barva_okvirja','frame_color','structure_color','slats_color',
+  'slats_type','lamelle_angle',
+  'house_wall_front','house_wall_back','house_wall_left','house_wall_right',
+  'post_front','post_rear','post_left','post_right',
+  'enc_front_type','enc_back_type','enc_left_type','enc_right_type',
+]);
+
+function hasPergola3DFields(schema: ConfiguratorSchema): boolean {
+  return schema.steps.some(s => s.fields.some(f => PERGOLA_3D_IDS.has(f.id)));
+}
+
+const VALID_ENC = new Set(['none','zip-screen','movable-slats','sliding-glass','fixed-glass','ventilation-panel','metal-panel']);
+
+function extractPergolaConfig(st: Record<string, unknown>): PergolaConfig {
+  const n = (keys: string[], fallback: number) => {
+    for (const k of keys) {
+      if (typeof st[k] === 'number') return st[k] as number;
+      if (typeof st[k] === 'string' && st[k] !== '' && !isNaN(Number(st[k]))) return Number(st[k]);
+    }
+    return fallback;
+  };
+  const s = (keys: string[], fallback: string) => {
+    for (const k of keys) if (typeof st[k] === 'string' && st[k]) return st[k] as string;
+    return fallback;
+  };
+  const b = (...keys: string[]) => keys.some(k => Boolean(st[k]));
+  const enc = (key: string): EnclosureType => {
+    const v = st[key];
+    return (typeof v === 'string' && VALID_ENC.has(v)) ? v as EnclosureType : 'none';
+  };
+  const seg = (typeKey: string, colorKey?: string): EnclosureSegment => ({
+    type: enc(typeKey),
+    colorHex: s(colorKey ? [colorKey, 'structure_color', 'color'] : ['structure_color', 'color'], '#383E42'),
+  });
+  const side = (typeKey: string, colorKey?: string): [EnclosureSegment, EnclosureSegment] =>
+    [seg(typeKey, colorKey), seg(typeKey, colorKey)];
+
+  return {
+    width:  n(['width','sirina','širina'], 400),
+    depth:  n(['depth','globina'], 300),
+    height: n(['height','visina','višina'], 250),
+    structureColor: s(['structure_color','color','barva','barva_okvirja','frame_color'], '#383E42'),
+    slatsColor:     s(['slats_color','color','barva'], '#383E42'),
+    slatsType:      st['slats_type'] === 'wavy' ? 'wavy' : 'flat',
+    lamelleAngle:   n(['lamelle_angle','kot_lamel','angle'], 0),
+    houseWalls: {
+      front: b('house_wall_front'),
+      back:  b('house_wall_back'),
+      left:  b('house_wall_left'),
+      right: b('house_wall_right'),
+    },
+    additionalPosts: {
+      front: { enabled: b('post_front'), offset: n(['post_front_offset'], 0) },
+      rear:  { enabled: b('post_rear'),  offset: n(['post_rear_offset'],  0) },
+      left:  { enabled: b('post_left'),  offset: n(['post_left_offset'],  0) },
+      right: { enabled: b('post_right'), offset: n(['post_right_offset'], 0) },
+    },
+    sideEnclosures: {
+      front: side('enc_front_type', 'enc_front_color'),
+      back:  side('enc_back_type',  'enc_back_color'),
+      left:  side('enc_left_type',  'enc_left_color'),
+      right: side('enc_right_type', 'enc_right_color'),
+    },
+  };
+}
 
 // ── Types ─────────────────────────────────────────────────────
 interface PublicCfg {
@@ -41,6 +116,8 @@ html,body{margin:0;padding:0;font-family:var(--fp,ui-sans-serif,system-ui,sans-s
 .fsc{width:24px;height:1px;background:var(--cl2);flex-shrink:0;margin:0 3px}
 /* Body */
 .fbd{display:flex;flex:1;min-height:0}
+.f3d{flex:1.4;min-width:0;overflow:hidden;position:relative}
+.frpanel{flex:1;display:flex;min-width:0;min-height:0;overflow:hidden;max-width:560px}
 .fmn{flex:1;overflow-y:auto;padding:32px 40px 110px;min-width:0}
 .fsb{width:272px;flex-shrink:0;border-left:1px solid var(--cl);background:var(--cs);overflow-y:auto;padding:24px 20px;display:flex;flex-direction:column;gap:14px}
 /* Step header */
@@ -139,6 +216,21 @@ input[type=range]::-webkit-slider-thumb{appearance:none;width:20px;height:20px;b
 .fsncT{font-size:13px;font-weight:500;margin-bottom:3px}
 .fsncd{font-size:12px;color:var(--ct);line-height:1.4}
 .ferrbanner{padding:12px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:var(--r2);font-size:13px;color:#b91c1c;margin-bottom:18px}
+/* Custom quote section */
+.fcqs{margin-top:24px;padding:20px;border:1px solid var(--cl2);border-radius:var(--r3);background:var(--cs)}
+.fcqs-h{display:flex;align-items:flex-start;gap:14px;margin-bottom:14px}
+.fcqs-icon{width:40px;height:40px;border-radius:50%;background:var(--c);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.fcqs-title{font-size:15px;font-weight:600;margin:0 0 3px;letter-spacing:-.015em}
+.fcqs-sub{font-size:13px;color:var(--ct);margin:0}
+.fcqs-badge{display:inline-block;font-size:10.5px;font-family:ui-monospace,monospace;font-weight:600;color:#92400e;background:#fef3c7;border:1px solid #fcd34d;border-radius:3px;padding:2px 7px;letter-spacing:.03em;margin-left:8px;vertical-align:middle}
+.fcqs-txt{width:100%;min-height:80px;border:1px solid var(--cl2);border-radius:var(--r2);padding:10px 12px;font-family:inherit;font-size:13.5px;resize:vertical;outline:none;line-height:1.5;background:#fff;box-sizing:border-box;margin-bottom:12px}
+.fcqs-txt:focus{border-color:var(--c)}
+.fcqs-ph{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fcqs-prev{width:56px;height:56px;border-radius:var(--r2);object-fit:cover;border:1px solid var(--cl2);flex-shrink:0}
+.fcqs-lbl{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid var(--cl2);border-radius:var(--r2);cursor:pointer;font-size:13px;color:#525252;background:#fff;transition:border-color .15s;font-family:inherit}
+.fcqs-lbl:hover{border-color:#d4d4d4}
+.fcqs-rm{font-size:12px;color:var(--cm);background:none;border:none;cursor:pointer;padding:4px 6px;font-family:inherit}
+@media(max-width:960px){.f3d{display:none!important}.frpanel{max-width:none!important;flex:1!important}}
 @media(max-width:700px){.fsb{display:none}.fmn{padding:24px 20px 100px}.fft{padding:12px 20px}.fst{padding:12px 20px}.fsl{display:none}.fsnxt{grid-template-columns:1fr}.fscs{padding:40px 20px 80px}}
 `;
 
@@ -291,6 +383,8 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
   const [leadRef, setLeadRef] = useState('');
   const [submitErr, setSubmitErr] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [customText, setCustomText] = useState('');
+  const [customPhoto, setCustomPhoto] = useState<string | null>(null);
   const styleRef = useRef(false);
 
   // Inject isolated CSS once
@@ -302,9 +396,10 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
     document.head.appendChild(el);
   }, []);
 
-  // Load schema from public API
+  // Load schema from public API (preview=1 bypasses live-only check for admins)
   useEffect(() => {
-    fetch(`/api/v1/public/configurators/${id}`)
+    const preview = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === '1';
+    fetch(`/api/v1/public/configurators/${id}${preview ? '?preview=1' : ''}`)
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then((d: PublicCfg) => {
         // Apply branding CSS vars
@@ -326,6 +421,9 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
   const currentStep = visibleSteps[stepIdx] ?? null;
   const visibleFields = currentStep ? (result?.visibleFields[currentStep.id] ?? []) : [];
 
+  const show3d = useMemo(() => schema ? hasPergola3DFields(schema) : false, [schema]);
+  const pergolaConfig = useMemo(() => extractPergolaConfig(state), [state]);
+
   const onChange = useCallback((fieldId: string, value: unknown) => {
     setState(prev => ({ ...prev, [fieldId]: value }));
   }, []);
@@ -341,10 +439,13 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
     setSubmitting(true);
     setSubmitErr('');
     try {
+      const submitState: Record<string, unknown> = { ...state };
+      if (customText.trim()) submitState._custom_request_text = customText.trim();
+      if (customPhoto) submitState._custom_request_photo = customPhoto;
       const res = await fetch(`/api/v1/public/configurators/${id}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ versionId: cfg.version, state }),
+        body: JSON.stringify({ versionId: cfg.version, state: submitState }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Failed');
@@ -451,62 +552,115 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
 
       {/* Body */}
       <div className="fbd">
-        <div className="fmn">
-          {submitErr && <div className="ferrbanner">{submitErr}</div>}
 
-          {currentStep && (
-            <>
-              <div className="fsh">
-                <h2>{currentStep.label}</h2>
-                {currentStep.description && <p>{currentStep.description}</p>}
-              </div>
-              <div className="ffl">
-                {visibleFields.map(field => {
-                  const isCheck = field.type === 'checkbox';
-                  const err = result.errors[field.id];
-                  return (
-                    <div key={field.id} className="ffe">
-                      {!isCheck && (
-                        <label className="fla">
-                          {field.label}
-                          {field.required && <span className="req"> *</span>}
-                        </label>
-                      )}
-                      {!isCheck && field.help && <span className="fhp">{field.help}</span>}
-                      <FieldComp field={field} value={state[field.id]} onChange={v => onChange(field.id, v)} error={err} />
-                      {err && state[field.id] !== undefined && <span className="ferr">{err}</span>}
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Pricing sidebar */}
-        {pricing.total > 0 && (
-          <div className="fsb">
-            <div className="fpt">Estimated price</div>
-            <div className="fptv">{fmt(pricing.total, pricing.currency || schema.currency)}</div>
-            <div className="fpvat">{pricing.vat > 0 ? `incl. ${fmt(pricing.vat, pricing.currency || schema.currency)} VAT` : 'excl. VAT'}</div>
-            {pricing.breakdown.length > 0 && (
-              <div className="fpbd">
-                {pricing.breakdown.map((item, i) => (
-                  <div key={i} className={`fpbr${item.kind === 'discount' ? ' disc' : ''}`}>
-                    <span className="fpbl">{item.label}</span>
-                    <span className="fpba">
-                      {item.kind === 'discount' ? '−' : ''}{fmt(Math.abs(item.amount), pricing.currency || schema.currency)}
-                    </span>
-                  </div>
-                ))}
-                <div className="fpsb">
-                  <span>Total</span>
-                  <span className="fpsba">{fmt(pricing.total, pricing.currency || schema.currency)}</span>
-                </div>
-              </div>
-            )}
+        {/* 3D viewer — only for configurators with dimensional fields */}
+        {show3d && (
+          <div className="f3d">
+            <Pergola3D cfg={pergolaConfig} />
           </div>
         )}
+
+        {/* Form + pricing panel */}
+        <div className={show3d ? 'frpanel' : 'fbd'} style={show3d ? undefined : { flex: 1 }}>
+          <div className="fmn">
+            {submitErr && <div className="ferrbanner">{submitErr}</div>}
+
+            {currentStep && (
+              <>
+                <div className="fsh">
+                  <h2>{currentStep.label}</h2>
+                  {currentStep.description && <p>{currentStep.description}</p>}
+                </div>
+                <div className="ffl">
+                  {visibleFields.map(field => {
+                    const isCheck = field.type === 'checkbox';
+                    const err = result.errors[field.id];
+                    return (
+                      <div key={field.id} className="ffe">
+                        {!isCheck && (
+                          <label className="fla">
+                            {field.label}
+                            {field.required && <span className="req"> *</span>}
+                          </label>
+                        )}
+                        {!isCheck && field.help && <span className="fhp">{field.help}</span>}
+                        <FieldComp field={field} value={state[field.id]} onChange={v => onChange(field.id, v)} error={err} />
+                        {err && state[field.id] !== undefined && <span className="ferr">{err}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Individualna ponudba — only on last step */}
+                {isLast && (
+                  <div className="fcqs">
+                    <div className="fcqs-h">
+                      <div className="fcqs-icon">✦</div>
+                      <div>
+                        <p className="fcqs-title">
+                          Posebna zahteva?
+                          <span className="fcqs-badge">Odgovor v 48h</span>
+                        </p>
+                        <p className="fcqs-sub">Pošljite sliko ali opis — naredimo individualno ponudbo po vaši meri.</p>
+                      </div>
+                    </div>
+                    <textarea
+                      className="fcqs-txt"
+                      placeholder="Opišite svojo posebno zahtevo (npr. nestandardne dimenzije, posebna barva, specifična montaža…)"
+                      value={customText}
+                      onChange={e => setCustomText(e.target.value)}
+                    />
+                    <div className="fcqs-ph">
+                      {customPhoto && <img src={customPhoto} className="fcqs-prev" alt="" />}
+                      <label className="fcqs-lbl">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+                          <polyline points="21,15 16,10 5,21"/>
+                        </svg>
+                        {customPhoto ? 'Zamenjaj sliko' : 'Priloži sliko (neobvezno)'}
+                        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = evt => setCustomPhoto((evt.target?.result as string) ?? null);
+                          reader.readAsDataURL(file);
+                        }} />
+                      </label>
+                      {customPhoto && (
+                        <button className="fcqs-rm" onClick={() => setCustomPhoto(null)}>× Odstrani</button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Pricing sidebar */}
+          {pricing.total > 0 && (
+            <div className="fsb">
+              <div className="fpt">Estimated price</div>
+              <div className="fptv">{fmt(pricing.total, pricing.currency || schema.currency)}</div>
+              <div className="fpvat">{pricing.vat > 0 ? `incl. ${fmt(pricing.vat, pricing.currency || schema.currency)} VAT` : 'excl. VAT'}</div>
+              {pricing.breakdown.length > 0 && (
+                <div className="fpbd">
+                  {pricing.breakdown.map((item, i) => (
+                    <div key={i} className={`fpbr${item.kind === 'discount' ? ' disc' : ''}`}>
+                      <span className="fpbl">{item.label}</span>
+                      <span className="fpba">
+                        {item.kind === 'discount' ? '−' : ''}{fmt(Math.abs(item.amount), pricing.currency || schema.currency)}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="fpsb">
+                    <span>Total</span>
+                    <span className="fpsba">{fmt(pricing.total, pricing.currency || schema.currency)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Footer */}

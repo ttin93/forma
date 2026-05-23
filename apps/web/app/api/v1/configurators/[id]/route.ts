@@ -65,7 +65,7 @@ export async function DELETE(
     .where(and(eq(configurators.id, id), eq(configurators.workspaceId, workspaceId))).limit(1);
   if (!cfg) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  await db.update(configurators).set({ archivedAt: new Date() })
+  await db.update(configurators).set({ archivedAt: new Date(), status: 'draft', liveVersionId: null })
     .where(and(eq(configurators.id, id), eq(configurators.workspaceId, workspaceId)));
 
   return NextResponse.json({ ok: true });
