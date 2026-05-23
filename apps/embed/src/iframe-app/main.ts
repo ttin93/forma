@@ -367,7 +367,7 @@ async function handleSubmit(): Promise<void> {
   try {
     const result = await submitLead({
       configId,
-      version: configData.version,
+      versionId: configData.version,
       state,
       meta: {
         host,
@@ -379,7 +379,7 @@ async function handleSubmit(): Promise<void> {
     });
 
     clearState(configId);
-    renderSuccess(result.leadRef);
+    renderSuccess(result.ref);
 
     if (result.redirectUrl) {
       postToHost('__forma:exit', { savedAt: new Date().toISOString() });

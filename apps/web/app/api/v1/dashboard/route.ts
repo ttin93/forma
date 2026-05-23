@@ -1,20 +1,21 @@
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { eq, and, gte, count, sum, sql, desc } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import { leads, configurators } from '@forma/db';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const { session } = await getSession();
   const workspaceId = session?.activeWorkspaceId;
   if (!workspaceId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const since30d = new Date();
-  since30d.setDate(since30d.getDate() - 30);
+  const days = parseInt(req.nextUrl.searchParams.get('days') ?? '30', 10) || 30;
+  const since = new Date();
+  since.setDate(since.getDate() - days);
 
   const [totalLeads, newLeadsCount, pipeline, cfgCount, recentLeads, topCfgs] = await Promise.all([
     db.select({ n: count() }).from(leads).where(
-      and(eq(leads.workspaceId, workspaceId), gte(leads.submittedAt, since30d), sql`${leads.deletedAt} IS NULL`),
+      and(eq(leads.workspaceId, workspaceId), gte(leads.submittedAt, since), sql`${leads.deletedAt} IS NULL`),
     ),
     db.select({ n: count() }).from(leads).where(
       and(eq(leads.workspaceId, workspaceId), eq(leads.status, 'new'), sql`${leads.deletedAt} IS NULL`),
@@ -63,6 +64,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
+    days,
     totalLeads: Number(totalLeads[0]?.n ?? 0),
     newLeads: Number(newLeadsCount[0]?.n ?? 0),
     pipeline: Number(pipeline[0]?.total ?? 0),

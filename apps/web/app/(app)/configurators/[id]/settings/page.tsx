@@ -16,8 +16,6 @@ interface ConfiguratorInfo {
   status: string;
 }
 
-const CDN_HOST = process.env.NEXT_PUBLIC_CDN_HOST ?? 'cdn.forma.studio';
-
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string; bg: string }> = {
     live: { label: 'Live', color: '#16a34a', bg: '#f0fdf4' },
@@ -105,8 +103,9 @@ export default function ConfiguratorSettingsPage() {
     setDomains(prev => prev.filter(d => d.id !== domainId));
   }
 
+  const appOrigin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL ?? '');
   const embedSnippet = info
-    ? `<script src="https://${CDN_HOST}/embed.js" data-configurator="${info.slug}" async></script>`
+    ? `<script src="${appOrigin}/embed.js" data-config="${info.id}" async></script>\n<div id="forma-${info.slug}"></div>`
     : '';
 
   function copySnippet() {
@@ -271,9 +270,10 @@ export default function ConfiguratorSettingsPage() {
           </button>
         </div>
         <p style={{ fontSize: 12, color: 'var(--color-text-3)', margin: '8px 0 0' }}>
-          The configurator will render inside an iframe at the location where you place the script.
-          Use <code style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>data-width</code> and{' '}
-          <code style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>data-height</code> attributes to control sizing.
+          The configurator renders inside an iframe. Use{' '}
+          <code style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>data-min-height</code> and{' '}
+          <code style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>data-max-height</code> to control sizing.
+          Add <code style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>data-events="true"</code> to enable postMessage events.
         </p>
       </section>
 

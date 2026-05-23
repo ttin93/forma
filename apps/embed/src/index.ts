@@ -4,13 +4,14 @@
  *              data-config="cfg_01HXYZ..." data-host="sunpergola.si"></script>
  */
 (function () {
-  const CDN = 'https://cdn.forma.studio';
-
   // Locate the script tag that loaded this file.
   // Works sync AND async because we search all matching scripts.
   const scripts = document.querySelectorAll<HTMLScriptElement>('script[data-config]');
   const scriptEl = scripts[scripts.length - 1];
   if (!scriptEl) return;
+
+  // Derive app origin from where embed.js was served (falls back to same origin).
+  const CDN = scriptEl.src ? new URL(scriptEl.src).origin : window.location.origin;
 
   const configId = scriptEl.dataset.config?.trim() ?? '';
   if (!configId) return;
@@ -22,7 +23,7 @@
 
   const parentOrigin = window.location.origin;
   const iframeSrc =
-    `${CDN}/iframe/${encodeURIComponent(configId)}` +
+    `${CDN}/i/${encodeURIComponent(configId)}` +
     `?host=${encodeURIComponent(dataHost)}` +
     `&parentOrigin=${encodeURIComponent(parentOrigin)}`;
 

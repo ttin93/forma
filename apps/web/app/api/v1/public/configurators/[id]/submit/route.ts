@@ -16,19 +16,30 @@ export function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS });
 }
 
+const contactSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  phone: z.string().optional(),
+  city: z.string().optional(),
+  consent: z.boolean().optional(),
+});
+
 const bodySchema = z.object({
   versionId: z.string().min(1),
   state: z.record(z.string(), z.unknown()),
-  contact: z.object({
-    name: z.string().min(1),
-    email: z.string().email(),
-    phone: z.string().optional(),
-    city: z.string().optional(),
-    consent: z.boolean().optional(),
-  }),
+  contact: contactSchema.optional(),
   sessionId: z.string().optional(),
   honeypot: z.string().optional(),
 });
+
+function extractContact(state: Record<string, unknown>) {
+  const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  const name = str(state.name ?? state.full_name ?? state.first_name ?? state.ime ?? state.naziv);
+  const email = str(state.email ?? state['e-mail'] ?? state.email_address);
+  const phone = str(state.phone ?? state.phone_number ?? state.telefon ?? state.tel);
+  const city = str(state.city ?? state.mesto ?? state.town);
+  return { name: name || 'Unknown', email, phone: phone || undefined, city: city || undefined };
+}
 
 export async function POST(
   req: NextRequest,
@@ -42,7 +53,11 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid input' }, { status: 400, headers: CORS });
   }
 
-  const { honeypot, ...data } = parsed.data;
+  const { honeypot, contact: explicitContact, ...data } = parsed.data;
+  const contact = explicitContact ?? extractContact(data.state);
+  if (!contact.email) {
+    return NextResponse.json({ error: 'Email is required' }, { status: 400, headers: CORS });
+  }
   if (honeypot && honeypot.trim().length > 0) {
     return NextResponse.json({ ref: 'OK', total: 0, currency: 'EUR' }, { headers: CORS });
   }
@@ -71,7 +86,7 @@ export async function POST(
         configuratorId: id,
         versionId: data.versionId,
         state: data.state,
-        contact: data.contact,
+        contact,
         meta: {
           host: origin,
           path: req.headers.get('referer') ?? '/',

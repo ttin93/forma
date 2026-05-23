@@ -1,5 +1,5 @@
-import { eq, and, desc, max, sql, count } from 'drizzle-orm';
-import { configurators, configuratorVersions, configuratorDomains, leads } from '@forma/db';
+import { eq, and, desc, max, sql } from 'drizzle-orm';
+import { configurators, configuratorVersions, configuratorDomains } from '@forma/db';
 import type { ConfiguratorSchema } from '@forma/types';
 import type { ServiceCtx } from './types';
 
@@ -164,18 +164,7 @@ export async function createConfigurator(
 }
 
 export async function listConfigurators(ctx: ServiceCtx) {
-  const leadCounts = ctx.db
-    .$with('lead_counts')
-    .as(
-      ctx.db
-        .select({ configuratorId: leads.configuratorId, n: count().as('n') })
-        .from(leads)
-        .where(sql`${leads.deletedAt} IS NULL`)
-        .groupBy(leads.configuratorId),
-    );
-
   return ctx.db
-    .with(leadCounts)
     .select({
       id: configurators.id,
       slug: configurators.slug,
@@ -183,10 +172,9 @@ export async function listConfigurators(ctx: ServiceCtx) {
       status: configurators.status,
       liveVersionId: configurators.liveVersionId,
       createdAt: configurators.createdAt,
-      leadCount: sql<number>`COALESCE(${leadCounts.n}, 0)`.mapWith(Number),
+      leadCount: sql<number>`(SELECT COUNT(*) FROM leads WHERE leads.configurator_id = ${configurators.id} AND leads.deleted_at IS NULL)`.mapWith(Number),
     })
     .from(configurators)
-    .leftJoin(leadCounts, eq(leadCounts.configuratorId, configurators.id))
     .where(and(eq(configurators.workspaceId, ctx.workspaceId), sql`${configurators.archivedAt} IS NULL`))
     .orderBy(desc(configurators.createdAt));
 }

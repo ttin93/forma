@@ -1,6 +1,6 @@
 import type { ConfiguratorSchema } from '@forma/types';
 
-const API_BASE = 'https://api.forma.studio/v1/public';
+const API_BASE = '/api/v1/public';
 
 export interface ConfiguratorResponse {
   id: string;
@@ -16,7 +16,7 @@ export interface ConfiguratorResponse {
 
 export interface SubmitPayload {
   configId: string;
-  version: string;
+  versionId: string;
   state: Record<string, unknown>;
   meta: {
     host: string;
@@ -28,8 +28,9 @@ export interface SubmitPayload {
 }
 
 export interface SubmitResult {
-  leadRef: string;
-  redirectUrl?: string;
+  ref: string;
+  total: number;
+  currency: string;
 }
 
 export async function fetchConfigurator(configId: string): Promise<ConfiguratorResponse> {
@@ -49,7 +50,12 @@ export async function submitLead(payload: SubmitPayload): Promise<SubmitResult> 
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      versionId: payload.versionId,
+      state: payload.state,
+      sessionId: payload.sessionId,
+      honeypot: payload.honeypot,
+    }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as { error?: string };
