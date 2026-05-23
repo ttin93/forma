@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     await tx.insert(memberships).values({ id: membershipId, workspaceId, userId, role: 'owner', joinedAt: new Date() });
   });
 
-  const session = await lucia.createSession(userId, { active_workspace_id: workspaceId });
+  const session = await lucia.createSession(userId, { activeWorkspaceId: workspaceId });
   const cookie = lucia.createSessionCookie(session.id);
   const cookieStore = await cookies();
   cookieStore.set(cookie.name, cookie.value, cookie.attributes);

@@ -15,12 +15,12 @@ export const lucia = new Lucia(adapter, {
     return {
       email: dbUser.email,
       name: dbUser.name,
-      avatarUrl: dbUser.avatar_url,
+      avatarUrl: dbUser.avatarUrl,
     };
   },
   getSessionAttributes(dbSession) {
     return {
-      activeWorkspaceId: dbSession.active_workspace_id,
+      activeWorkspaceId: dbSession.activeWorkspaceId,
     };
   },
 });
@@ -31,10 +31,10 @@ declare module 'lucia' {
     DatabaseUserAttributes: {
       email: string;
       name: string | null;
-      avatar_url: string | null;
+      avatarUrl: string | null;
     };
     DatabaseSessionAttributes: {
-      active_workspace_id: string | null;
+      activeWorkspaceId: string | null;
     };
   }
 }

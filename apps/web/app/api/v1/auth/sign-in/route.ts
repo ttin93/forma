@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   const ownerMs = userMemberships.find(m => m.role === 'owner');
   const activeWorkspaceId = (ownerMs ?? userMemberships[0])?.workspaceId ?? null;
 
-  const session = await lucia.createSession(user.id, { active_workspace_id: activeWorkspaceId });
+  const session = await lucia.createSession(user.id, { activeWorkspaceId: activeWorkspaceId });
   const cookie = lucia.createSessionCookie(session.id);
   const cookieStore = await cookies();
   cookieStore.set(cookie.name, cookie.value, cookie.attributes);
