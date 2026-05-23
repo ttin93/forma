@@ -800,13 +800,15 @@ export function BuilderClient({
 
       dispatch({ type: 'SET_PUBLISHING', value: true });
       const pubRes = await fetch(`/api/v1/configurators/${configuratorId}/publish`, { method: 'POST' });
-      if (pubRes.status === 402) {
-        const body = await pubRes.json() as { message?: string };
-        setUpgradeMsg(body.message ?? 'Upgrade your plan to publish more configurators.');
-        dispatch({ type: 'SET_SAVING', value: false });
-        return;
+      if (!pubRes.ok) {
+        const body = await pubRes.json().catch(() => ({})) as { error?: string; message?: string };
+        if (body.error === 'plan_limit') {
+          setUpgradeMsg(body.message ?? 'Upgrade your plan to publish more configurators.');
+          dispatch({ type: 'SET_SAVING', value: false });
+          return;
+        }
+        throw new Error(body.message ?? `Publish failed (${pubRes.status})`);
       }
-      if (!pubRes.ok) throw new Error(await pubRes.text());
       dispatch({ type: 'SAVED' });
     } catch (err) {
       dispatch({ type: 'SAVE_ERROR', message: err instanceof Error ? err.message : 'Publish failed' });
