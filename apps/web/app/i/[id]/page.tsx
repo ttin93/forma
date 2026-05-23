@@ -136,7 +136,7 @@ html,body{margin:0;padding:0;font-family:var(--fp,ui-sans-serif,system-ui,sans-s
 .f3d-tab{padding:5px 11px;border-radius:4px;border:none;font-size:12.5px;cursor:pointer;font-family:inherit;transition:all .12s;background:transparent;color:#525252;line-height:1.4}
 .f3d-tab.act{background:#0a0a0a;color:#fff}
 .f3d-tab:hover:not(.act){background:var(--cs)}
-.f3d-canvas{position:relative;aspect-ratio:4/3;background:#fafafa;overflow:hidden}
+.f3d-canvas{position:relative;aspect-ratio:4/3;max-height:calc(100vh - 280px);min-height:200px;background:#fafafa;overflow:hidden}
 .f3d-area-bar{padding:11px 14px;border-top:1px solid var(--cl);display:flex;justify-content:space-between;align-items:center;font-size:12px;flex-shrink:0}
 .f3d-area-lbl{color:var(--cm)}
 .f3d-area-val{font-family:ui-monospace,monospace;color:#525252;font-size:12px}
