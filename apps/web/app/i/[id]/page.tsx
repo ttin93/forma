@@ -578,6 +578,21 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
               </div>
             ))}
           </div>
+          <button
+            className="fbtn fbtn-g"
+            style={{ marginTop: 28, fontSize: 13.5 }}
+            onClick={() => {
+              setSubmitted(false);
+              setLeadRef('');
+              setSubmitErr('');
+              setState({});
+              setStepIdx(0);
+              setCustomText('');
+              setCustomPhoto(null);
+            }}
+          >
+            ← Konfiguriraj znova
+          </button>
         </div>
       </div>
     );
