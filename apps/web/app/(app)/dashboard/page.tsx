@@ -140,7 +140,7 @@ export default function DashboardPage() {
                         onClick={() => { setDays(opt.days); setShowRangePicker(false); }}
                         style={{
                           display: 'block', width: '100%', textAlign: 'left',
-                          padding: '9px 14px', fontSize: 13, background: 'none', border: 'none',
+                          padding: '9px 14px', fontSize: 13, border: 'none',
                           cursor: 'pointer', color: 'var(--color-ink)',
                           fontWeight: opt.days === days ? 600 : 400,
                           background: opt.days === days ? 'var(--color-surface)' : 'transparent',
