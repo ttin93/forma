@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { use } from 'react';
 import { usePathname } from 'next/navigation';
 import { Icons } from '@/components/ui';
 
@@ -9,10 +10,11 @@ export default function ConfiguratorLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = use(params);
   const pathname = usePathname();
-  const base = `/configurators/${params.id}`;
+  const base = `/configurators/${id}`;
 
   const tabs = [
     { label: 'Builder', href: `${base}/builder`, icon: Icons.edit },
