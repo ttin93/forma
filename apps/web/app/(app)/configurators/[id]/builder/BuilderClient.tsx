@@ -767,7 +767,7 @@ export function BuilderClient({
 
   const [showAddField, setShowAddField] = useState(false);
   const [showGuide, setShowGuide] = useState(() => initialSchema.steps.length === 0);
-  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
+  const [upgradeInfo, setUpgradeInfo] = useState<{ message: string; limit: number } | null>(null);
 
   const allFields = state.schema.steps.flatMap(s => s.fields);
   const selectedStep = state.schema.steps[state.selectedStepIdx];
@@ -801,9 +801,9 @@ export function BuilderClient({
       dispatch({ type: 'SET_PUBLISHING', value: true });
       const pubRes = await fetch(`/api/v1/configurators/${configuratorId}/publish`, { method: 'POST' });
       if (!pubRes.ok) {
-        const body = await pubRes.json().catch(() => ({})) as { error?: string; message?: string };
+        const body = await pubRes.json().catch(() => ({})) as { error?: string; message?: string; limit?: number };
         if (body.error === 'plan_limit') {
-          setUpgradeMsg(body.message ?? 'Upgrade your plan to publish more configurators.');
+          setUpgradeInfo({ message: body.message ?? 'Upgrade your plan to publish more configurators.', limit: body.limit ?? 1 });
           dispatch({ type: 'SET_SAVING', value: false });
           return;
         }
@@ -1053,40 +1053,54 @@ export function BuilderClient({
       )}
 
       {/* Upgrade modal */}
-      {upgradeMsg && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.35)' }}
-          onClick={() => setUpgradeMsg(null)}>
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{ background: '#fff', borderRadius: 'var(--radius-3)', padding: '32px 28px', maxWidth: 400, width: '90%', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
-          >
-            <div style={{ fontSize: 28, marginBottom: 12 }}>🚀</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-ink)', marginBottom: 8 }}>
-              Plan limit reached
-            </div>
-            <p style={{ fontSize: 13.5, color: 'var(--color-text-3)', margin: '0 0 24px', lineHeight: 1.6 }}>
-              {upgradeMsg}
-            </p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <a
-                href="/settings/billing"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', height: 36, padding: '0 18px',
-                  background: '#0a0a0a', color: '#fff', borderRadius: 'var(--radius-2)',
-                  fontSize: 13, fontWeight: 500, textDecoration: 'none',
-                }}
-              >
-                Upgrade plan →
-              </a>
-              <button
-                onClick={() => setUpgradeMsg(null)}
-                style={{ height: 36, padding: '0 18px', border: '1px solid var(--color-line-2)', background: '#fff', borderRadius: 'var(--radius-2)', fontSize: 13, cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
+      {upgradeInfo && (
+        <>
+          <style>{`@keyframes _upgrade_pulse{0%,100%{box-shadow:0 0 0 0 rgba(10,10,10,0.35)}50%{box-shadow:0 0 0 7px rgba(10,10,10,0)}}`}</style>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.35)' }}
+            onClick={() => setUpgradeInfo(null)}>
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{ background: '#fff', borderRadius: 'var(--radius-3)', padding: '32px 28px', maxWidth: 400, width: '90%', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
+            >
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-ink)', marginBottom: 8 }}>
+                Plan limit reached
+              </div>
+              <p style={{ fontSize: 13.5, color: 'var(--color-text-3)', margin: '0 0 16px', lineHeight: 1.6 }}>
+                {upgradeInfo.message}
+              </p>
+              <div style={{ margin: '0 0 24px', textAlign: 'left' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+                  <span style={{ color: 'var(--color-text-3)' }}>Live configurators</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: '#ef4444', fontWeight: 600 }}>
+                    {upgradeInfo.limit} / {upgradeInfo.limit}
+                  </span>
+                </div>
+                <div style={{ height: 4, background: 'var(--color-line)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: '100%', height: '100%', background: '#ef4444', borderRadius: 4 }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+                <a
+                  href="/settings/billing"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', height: 36, padding: '0 18px',
+                    background: '#0a0a0a', color: '#fff', borderRadius: 'var(--radius-2)',
+                    fontSize: 13, fontWeight: 500, textDecoration: 'none',
+                    animation: '_upgrade_pulse 2s ease-in-out infinite',
+                  }}
+                >
+                  Upgrade plan →
+                </a>
+                <button
+                  onClick={() => setUpgradeInfo(null)}
+                  style={{ height: 36, padding: '0 18px', border: '1px solid var(--color-line-2)', background: '#fff', borderRadius: 'var(--radius-2)', fontSize: 13, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
