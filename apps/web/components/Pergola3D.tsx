@@ -1,8 +1,8 @@
 'use client';
 
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, ContactShadows, Html } from '@react-three/drei';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import * as THREE from 'three';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -407,6 +407,23 @@ function DimensionsGroup({ cfg }: { cfg: PergolaConfig }) {
   );
 }
 
+// ── AR/GLB exporter ───────────────────────────────────────────────────────────
+
+function SceneExporter({ exportRef }: { exportRef: React.MutableRefObject<(() => Promise<Blob>) | null> }) {
+  const { scene } = useThree();
+  useEffect(() => {
+    exportRef.current = async () => {
+      const { GLTFExporter } = await import('three/examples/jsm/exporters/GLTFExporter.js');
+      const exporter = new GLTFExporter();
+      const target = scene.getObjectByName('pergola-structure') ?? scene;
+      const result = await exporter.parseAsync(target, { binary: true }) as ArrayBuffer;
+      return new Blob([result], { type: 'model/gltf-binary' });
+    };
+    return () => { exportRef.current = null; };
+  }, [scene, exportRef]);
+  return null;
+}
+
 // ── Scene ─────────────────────────────────────────────────────────────────────
 
 function PergolaScene({ cfg }: { cfg: PergolaConfig }) {
@@ -414,11 +431,13 @@ function PergolaScene({ cfg }: { cfg: PergolaConfig }) {
   const size = Math.max(W, L, cfg.height/100);
   return (
     <group name="pergola-model">
-      <WallAttachmentGroup cfg={cfg} />
-      <PostsGroup cfg={cfg} />
-      <RoofBeamsGroup cfg={cfg} />
-      <LouversGroup cfg={cfg} />
-      <SideEnclosureGroup cfg={cfg} />
+      <group name="pergola-structure">
+        <WallAttachmentGroup cfg={cfg} />
+        <PostsGroup cfg={cfg} />
+        <RoofBeamsGroup cfg={cfg} />
+        <LouversGroup cfg={cfg} />
+        <SideEnclosureGroup cfg={cfg} />
+      </group>
       <DimensionsGroup cfg={cfg} />
       <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[size*10, size*10]} />
@@ -428,7 +447,11 @@ function PergolaScene({ cfg }: { cfg: PergolaConfig }) {
   );
 }
 
-export function Pergola3D({ cfg, style }: { cfg: PergolaConfig; style?: React.CSSProperties }) {
+export function Pergola3D({ cfg, style, exportRef }: {
+  cfg: PergolaConfig;
+  style?: React.CSSProperties;
+  exportRef?: React.MutableRefObject<(() => Promise<Blob>) | null>;
+}) {
   const W = cfg.width/100; const L = cfg.depth/100; const H = cfg.height/100;
   const size = Math.max(W, L, H);
   const cam = size * 2.2;
@@ -449,6 +472,7 @@ export function Pergola3D({ cfg, style }: { cfg: PergolaConfig; style?: React.CS
         shadow-camera-top={12} shadow-camera-bottom={-12} shadow-camera-far={50} />
       <directionalLight position={[-4,5,-4]} intensity={0.3} />
       <ContactShadows position={[0,0.001,0]} opacity={0.3} scale={size*6} blur={2.5} far={H+1} color="#9aabb5" />
+      {exportRef && <SceneExporter exportRef={exportRef} />}
       <PergolaScene cfg={cfg} />
     </Canvas>
   );

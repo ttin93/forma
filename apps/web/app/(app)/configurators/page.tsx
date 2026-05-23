@@ -117,15 +117,21 @@ export default function ConfiguratorsPage() {
                       {c.leadCount} lead{c.leadCount !== 1 ? 's' : ''}
                     </div>
                   )}
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
                     <Link href={`/configurators/${c.id}/builder`} style={{ flex: 1 }}>
                       <Btn variant="secondary" size="sm" full>Builder</Btn>
                     </Link>
+                    <a
+                      href={`/i/${c.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Odpri konfigurator (za stranke)"
+                      style={{ display: 'inline-flex', alignItems: 'center', height: 28, padding: '0 10px', border: '1px solid var(--color-line)', borderRadius: 'var(--radius-2)', fontSize: 12.5, color: 'var(--color-text-3)', textDecoration: 'none', background: '#fff' }}
+                    >
+                      ↗ Odpri
+                    </a>
                     <Link href={`/configurators/${c.id}/settings`}>
                       <Btn variant="secondary" size="sm">Settings</Btn>
-                    </Link>
-                    <Link href={`/configurators/${c.id}/preview`}>
-                      <Btn variant="secondary" size="sm">Preview</Btn>
                     </Link>
                     <Btn variant="ghost" size="sm" disabled={deleting === c.id} onClick={() => deleteConfigurator(c.id, c.name)}>
                       {deleting === c.id ? '…' : 'Archive'}

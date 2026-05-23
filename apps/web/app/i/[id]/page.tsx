@@ -11,6 +11,19 @@ const Pergola3D = dynamic(
   { ssr: false, loading: () => <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(175deg,#e8edf2,#d6dde6)' }}><div style={{ width: 28, height: 28, border: '2px solid #c8d0d8', borderTopColor: '#5a7a8a', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /></div> }
 );
 
+// model-viewer web component — no @types package exists
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      'model-viewer': {
+        src?: string; ar?: string; 'ar-modes'?: string;
+        'camera-controls'?: string; 'shadow-intensity'?: string;
+        alt?: string; style?: import('react').CSSProperties; id?: string; className?: string;
+      };
+    }
+  }
+}
+
 const PERGOLA_3D_IDS = new Set([
   'width','sirina','širina','depth','globina','height','visina','višina',
   'color','barva','barva_okvirja','frame_color','structure_color','slats_color',
@@ -230,7 +243,17 @@ input[type=range]::-webkit-slider-thumb{appearance:none;width:20px;height:20px;b
 .fcqs-lbl{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid var(--cl2);border-radius:var(--r2);cursor:pointer;font-size:13px;color:#525252;background:#fff;transition:border-color .15s;font-family:inherit}
 .fcqs-lbl:hover{border-color:#d4d4d4}
 .fcqs-rm{font-size:12px;color:var(--cm);background:none;border:none;cursor:pointer;padding:4px 6px;font-family:inherit}
-@media(max-width:960px){.f3d{display:none!important}.frpanel{max-width:none!important;flex:1!important}}
+/* AR viewer */
+.f3d-ar-btn{position:absolute;bottom:14px;right:14px;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(10,10,10,.78);color:#fff;border:none;border-radius:var(--r2);font-size:12.5px;font-weight:500;cursor:pointer;font-family:inherit;backdrop-filter:blur(8px);z-index:10;transition:opacity .15s;letter-spacing:.01em}
+.f3d-ar-btn:hover:not(:disabled){opacity:.82}
+.f3d-ar-btn:disabled{opacity:.5;cursor:default}
+.f3d-ar-btn-m{display:none}
+.f3d-ar-overlay{position:fixed;inset:0;z-index:9999;background:#111;display:flex;flex-direction:column}
+.f3d-ar-topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,.12);flex-shrink:0}
+.f3d-ar-title{font-size:14.5px;font-weight:500;color:#fff;letter-spacing:-.01em}
+.f3d-ar-close{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;font-family:inherit}
+.f3d-ar-hint{padding:10px 20px 14px;text-align:center;font-size:12px;color:#666;flex-shrink:0}
+@media(max-width:960px){.f3d{display:none!important}.frpanel{max-width:none!important;flex:1!important}.f3d-ar-btn-m{display:inline-flex}}
 @media(max-width:700px){.fsb{display:none}.fmn{padding:24px 20px 100px}.fft{padding:12px 20px}.fst{padding:12px 20px}.fsl{display:none}.fsnxt{grid-template-columns:1fr}.fscs{padding:40px 20px 80px}}
 `;
 
@@ -385,6 +408,9 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
   const [submitting, setSubmitting] = useState(false);
   const [customText, setCustomText] = useState('');
   const [customPhoto, setCustomPhoto] = useState<string | null>(null);
+  const [arUrl, setArUrl] = useState<string | null>(null);
+  const [arLoading, setArLoading] = useState(false);
+  const exportGlbRef = useRef<(() => Promise<Blob>) | null>(null);
   const styleRef = useRef(false);
 
   // Inject isolated CSS once
@@ -447,9 +473,11 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ versionId: cfg.version, state: submitState }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? 'Failed');
-      setLeadRef(json.ref ?? '');
+      const text = await res.text();
+      let json: Record<string, unknown> = {};
+      try { if (text.trim()) json = JSON.parse(text); } catch { /* non-JSON body, use empty */ }
+      if (!res.ok) throw new Error(String(json.error ?? `Server error (${res.status})`))
+      setLeadRef(String(json.ref ?? ''));
       setSubmitted(true);
       postMsg('submitted', { leadRef: json.ref });
     } catch (e) {
@@ -457,6 +485,36 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleAR() {
+    if (arLoading || !exportGlbRef.current) return;
+    setArLoading(true);
+    try {
+      if (typeof customElements !== 'undefined' && !customElements.get('model-viewer')) {
+        await new Promise<void>((resolve, reject) => {
+          if (document.querySelector('script[data-mv]')) { resolve(); return; }
+          const s = document.createElement('script');
+          s.type = 'module';
+          s.src = 'https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js';
+          s.setAttribute('data-mv', '1');
+          s.onload = () => resolve();
+          s.onerror = () => reject(new Error('model-viewer load failed'));
+          document.head.appendChild(s);
+        });
+      }
+      const blob = await exportGlbRef.current();
+      const url = URL.createObjectURL(blob);
+      setArUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
+    } catch (e) {
+      console.error('AR export failed', e);
+    } finally {
+      setArLoading(false);
+    }
+  }
+
+  function closeAr() {
+    setArUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
   }
 
   // ── Loading ───────────────────────────────────────────────
@@ -556,7 +614,13 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
         {/* 3D viewer — only for configurators with dimensional fields */}
         {show3d && (
           <div className="f3d">
-            <Pergola3D cfg={pergolaConfig} />
+            <Pergola3D cfg={pergolaConfig} exportRef={exportGlbRef} />
+            <button className="f3d-ar-btn" onClick={handleAR} disabled={arLoading} title="Poglej pergolo v svojem prostoru">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+              </svg>
+              {arLoading ? 'Pripravljam…' : 'Poglej v AR'}
+            </button>
           </div>
         )}
 
@@ -671,6 +735,14 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
           {pricing.vat > 0 && <span className="fprvat">incl. VAT</span>}
         </div>
         <div className="fnv">
+          {show3d && (
+            <button className="fbtn fbtn-g f3d-ar-btn-m" onClick={handleAR} disabled={arLoading} title="Poglej v AR">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+              </svg>
+              {arLoading ? '…' : 'AR'}
+            </button>
+          )}
           {stepIdx > 0 && (
             <button className="fbtn fbtn-g" onClick={() => setStepIdx(i => i - 1)}>← Back</button>
           )}
@@ -683,6 +755,28 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
           )}
         </div>
       </div>
+
+      {/* AR overlay — model-viewer web component loaded lazily from CDN */}
+      {arUrl && (
+        <div className="f3d-ar-overlay">
+          <div className="f3d-ar-topbar">
+            <span className="f3d-ar-title">AR — Vaša pergola v prostoru</span>
+            <button className="f3d-ar-close" onClick={closeAr} aria-label="Zapri">×</button>
+          </div>
+          <model-viewer
+            src={arUrl}
+            ar=""
+            ar-modes="scene-viewer webxr quick-look"
+            camera-controls=""
+            shadow-intensity="1"
+            alt="Vaša konfigurirana pergola"
+            style={{ width: '100%', flex: 1, background: '#1a1a1a' }}
+          />
+          <div className="f3d-ar-hint">
+            Tapnite gumb AR v ogledalniku · deluje na Android (ARCore) in iOS (Quick Look)
+          </div>
+        </div>
+      )}
     </div>
   );
 }

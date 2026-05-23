@@ -102,10 +102,11 @@ export async function POST(
     return NextResponse.json({ error: 'Internal error' }, { status: 500, headers: CORS });
   }
 
-  await inngest.send({
+  // Background job failure must not block the response — lead is already persisted
+  inngest.send({
     name: 'lead/submitted',
     data: { leadId, workspaceId: cfg.workspaceId, leadRef },
-  });
+  }).catch(err => console.error({ err, leadId }, 'inngest.send failed'));
 
   return NextResponse.json(
     { ref: leadRef, total: Number(totalCents), currency },
