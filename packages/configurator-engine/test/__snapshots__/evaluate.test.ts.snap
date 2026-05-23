@@ -1,0 +1,64 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`evaluate — pergola classic > snapshot — reference state > pricing breakdown matches snapshot 1`] = `
+{
+  "breakdown": [
+    {
+      "amount": 470400,
+      "kind": "base",
+      "label": "Base · €320/m²",
+      "ruleId": "base-area",
+    },
+    {
+      "amount": 14000,
+      "kind": "add",
+      "label": "LED strip lighting",
+      "ruleId": "led",
+    },
+    {
+      "amount": 106568,
+      "kind": "vat",
+      "label": "VAT (22%)",
+      "ruleId": "vat",
+    },
+  ],
+  "currency": "EUR",
+  "subtotal": 484400,
+  "total": 590968,
+  "vat": 106568,
+}
+`;
+
+exports[`evaluate — pergola classic > snapshot — reference state > scoring matches snapshot 1`] = `
+{
+  "hot": true,
+  "reasons": [
+    {
+      "points": 30,
+      "reason": "Large pergola (width ≥ 5m)",
+      "ruleId": "large-area",
+    },
+    {
+      "points": 15,
+      "reason": "Added LED lighting",
+      "ruleId": "led-addon",
+    },
+    {
+      "points": 20,
+      "reason": "Added heating",
+      "ruleId": "heaters-addon",
+    },
+    {
+      "points": 10,
+      "reason": "Premium colour selected",
+      "ruleId": "premium-color",
+    },
+    {
+      "points": 25,
+      "reason": "Provided phone number",
+      "ruleId": "phone-provided",
+    },
+  ],
+  "total": 100,
+}
+`;

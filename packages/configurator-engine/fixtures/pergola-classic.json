@@ -1,0 +1,212 @@
+{
+  "version": 1,
+  "id": "pergola-classic-v1",
+  "name": "Pergola Classic",
+  "currency": "EUR",
+  "locale": "sl-SI",
+  "steps": [
+    {
+      "id": "dimensions",
+      "label": "Dimensions",
+      "description": "Choose the size of your pergola",
+      "layout": "split-preview",
+      "fields": [
+        {
+          "id": "width",
+          "type": "number-slider",
+          "label": "Width",
+          "min": 2,
+          "max": 8,
+          "step": 0.1,
+          "default": 4,
+          "unit": "m",
+          "required": true,
+          "affectsPrice": true
+        },
+        {
+          "id": "depth",
+          "type": "number-slider",
+          "label": "Depth",
+          "min": 2,
+          "max": 6,
+          "step": 0.1,
+          "default": 3,
+          "unit": "m",
+          "required": true,
+          "affectsPrice": true
+        }
+      ]
+    },
+    {
+      "id": "finish",
+      "label": "Finish",
+      "description": "Select colour and material options",
+      "layout": "grid",
+      "fields": [
+        {
+          "id": "color",
+          "type": "swatch",
+          "label": "Colour",
+          "required": true,
+          "affectsPrice": true,
+          "default": "anthracite",
+          "options": [
+            { "id": "anthracite", "label": "Anthracite", "color": "#3a3a3a" },
+            { "id": "walnut",     "label": "Walnut",     "color": "#7b5930" },
+            { "id": "white",      "label": "White",      "color": "#fafafa" },
+            { "id": "stone",      "label": "Stone",      "color": "#b0a898" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "accessories",
+      "label": "Accessories",
+      "layout": "single",
+      "fields": [
+        {
+          "id": "led",
+          "type": "checkbox",
+          "label": "LED Strip Lighting",
+          "help": "Integrated LED strip along the beams",
+          "default": false,
+          "affectsPrice": true
+        },
+        {
+          "id": "heaters",
+          "type": "quantity",
+          "label": "Infrared Heaters",
+          "min": 0,
+          "max": 4,
+          "default": 0,
+          "affectsPrice": true
+        }
+      ]
+    },
+    {
+      "id": "contact",
+      "label": "Your Details",
+      "layout": "single",
+      "fields": [
+        {
+          "id": "name",
+          "type": "text",
+          "label": "Full name",
+          "required": true,
+          "affectsPrice": false,
+          "showInSummary": true
+        },
+        {
+          "id": "email",
+          "type": "email",
+          "label": "Email address",
+          "required": true,
+          "affectsPrice": false,
+          "showInSummary": true
+        },
+        {
+          "id": "phone",
+          "type": "phone",
+          "label": "Phone",
+          "required": false,
+          "affectsPrice": false,
+          "defaultRegion": "SI"
+        },
+        {
+          "id": "promo",
+          "type": "text",
+          "label": "Promo code",
+          "required": false,
+          "affectsPrice": true
+        }
+      ]
+    }
+  ],
+  "pricing": [
+    {
+      "id": "base-area",
+      "kind": "base",
+      "label": "Base · €320/m²",
+      "visibleInBreakdown": true,
+      "formula": {
+        "times": [
+          { "area": { "width": "$width", "depth": "$depth" } },
+          320
+        ]
+      }
+    },
+    {
+      "id": "color-walnut",
+      "kind": "add",
+      "label": "Colour surcharge (walnut)",
+      "when": { "eq": ["$color", "walnut"] },
+      "formula": { "perOption": { "ref": "$color", "prices": { "walnut": 280 } } }
+    },
+    {
+      "id": "reinforced-post",
+      "kind": "add",
+      "label": "Reinforced post (W ≥ 5m)",
+      "when": { "gte": ["$width", 5] },
+      "formula": 280
+    },
+    {
+      "id": "led",
+      "kind": "add",
+      "label": "LED strip lighting",
+      "when": { "eq": ["$led", true] },
+      "formula": 140
+    },
+    {
+      "id": "heater",
+      "kind": "add",
+      "label": "Infrared heater",
+      "when": { "gt": ["$heaters", 0] },
+      "formula": { "times": [{ "ref": "$heaters" }, 210] }
+    },
+    {
+      "id": "promo-firstwk",
+      "kind": "discount",
+      "label": "First-week buyer discount",
+      "when": { "matches": ["$promo", "^FIRSTWK[0-9]+$"] },
+      "formula": 444
+    },
+    {
+      "id": "vat",
+      "kind": "vat",
+      "label": "VAT (22%)",
+      "rate": 0.22
+    }
+  ],
+  "scoring": [
+    {
+      "id": "large-area",
+      "when": { "gte": ["$width", 5] },
+      "points": 30,
+      "reason": "Large pergola (width ≥ 5m)"
+    },
+    {
+      "id": "led-addon",
+      "when": { "eq": ["$led", true] },
+      "points": 15,
+      "reason": "Added LED lighting"
+    },
+    {
+      "id": "heaters-addon",
+      "when": { "gt": ["$heaters", 0] },
+      "points": 20,
+      "reason": "Added heating"
+    },
+    {
+      "id": "premium-color",
+      "when": { "in": ["$color", ["walnut"]] },
+      "points": 10,
+      "reason": "Premium colour selected"
+    },
+    {
+      "id": "phone-provided",
+      "when": { "neq": ["$phone", ""] },
+      "points": 25,
+      "reason": "Provided phone number"
+    }
+  ]
+}

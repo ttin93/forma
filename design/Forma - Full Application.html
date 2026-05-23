@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Forma — Configurator Platform · Design Canvas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="tokens.css" />
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body { font-family: var(--f-sans); background: #f0eee9; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="shared.jsx"></script>
+  <script type="text/babel" src="marketing.jsx"></script>
+  <script type="text/babel" src="auth.jsx"></script>
+  <script type="text/babel" src="dashboard.jsx"></script>
+  <script type="text/babel" src="configurator.jsx"></script>
+  <script type="text/babel" src="leads.jsx"></script>
+  <script type="text/babel" src="embed-settings.jsx"></script>
+  <script type="text/babel" src="enduser.jsx"></script>
+  <script type="text/babel" src="modals.jsx"></script>
+
+  <script type="text/babel">
+    // Standard desktop app artboard size and end-user/marketing artboard size.
+    const APP_W = 1440, APP_H = 900;
+    const MOBILE_W = 390, MOBILE_H = 844;
+    const MODAL_W = 760, MODAL_H = 560;
+
+    function App() {
+      return (
+        <DesignCanvas>
+
+          <DCSection id="marketing" title="01 · Marketing site"
+            subtitle="The public-facing B2B SaaS surface. Strict monochrome, big serif accents.">
+            <DCArtboard id="landing" label="Landing — hero, social proof & CTA" width={APP_W} height={2400}>
+              <MarkLanding />
+            </DCArtboard>
+            <DCArtboard id="pricing" label="Pricing — 3 plans + comparison table" width={APP_W} height={1700}>
+              <MarkPricing />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="auth" title="02 · Auth & onboarding"
+            subtitle="Splits, wizards, brand pull-through.">
+            <DCArtboard id="signin"  label="Sign in"    width={APP_W} height={APP_H}><AuthSignIn /></DCArtboard>
+            <DCArtboard id="signup"  label="Sign up — workspace create" width={APP_W} height={APP_H}><AuthSignUp /></DCArtboard>
+            <DCArtboard id="onb1"    label="Onboarding · Step 1 — product"  width={APP_W} height={APP_H}><Onb1 /></DCArtboard>
+            <DCArtboard id="onb2"    label="Onboarding · Step 2 — brand"    width={APP_W} height={APP_H}><Onb2 /></DCArtboard>
+          </DCSection>
+
+          <DCSection id="admin" title="03 · Admin — Dashboard & Analytics"
+            subtitle="The maker's command center. KPI, funnel, leaderboard, heatmap.">
+            <DCArtboard id="dash"      label="Dashboard — workspace overview" width={APP_W} height={1340}><Dashboard /></DCArtboard>
+            <DCArtboard id="analytics" label="Analytics — sessions, funnel, geo, heatmap" width={APP_W} height={1240}><Analytics /></DCArtboard>
+          </DCSection>
+
+          <DCSection id="cfg" title="04 · Configurators — manage, build, preview"
+            subtitle="From list to live edit with logic + pricing + per-step preview.">
+            <DCArtboard id="list"    label="Configurators — grid" width={APP_W} height={APP_H}><ConfigList /></DCArtboard>
+            <DCArtboard id="builder" label="Builder — flow · canvas · inspector" width={APP_W} height={APP_H}><ConfigBuilder /></DCArtboard>
+            <DCArtboard id="preview" label="Preview — buyer view + session inspector" width={APP_W} height={1080}><ConfigPreview /></DCArtboard>
+          </DCSection>
+
+          <DCSection id="leads" title="05 · Leads — inbox, pipeline, detail"
+            subtitle="Real submissions, scored and routed.">
+            <DCArtboard id="inbox"    label="Inbox — table view"    width={APP_W} height={APP_H}><LeadsInbox /></DCArtboard>
+            <DCArtboard id="pipeline" label="Pipeline — kanban"     width={APP_W} height={APP_H}><LeadsPipeline /></DCArtboard>
+            <DCArtboard id="detail"   label="Lead detail — quote · conversation · activity" width={APP_W} height={1280}><LeadDetail /></DCArtboard>
+          </DCSection>
+
+          <DCSection id="ops" title="06 · Embed, customers & settings"
+            subtitle="Where the app meets the rest of the buyer's stack.">
+            <DCArtboard id="embed"    label="Embed & API"       width={APP_W} height={1200}><EmbedPage /></DCArtboard>
+            <DCArtboard id="cust"     label="Customers — table" width={APP_W} height={APP_H}><Customers /></DCArtboard>
+            <DCArtboard id="billing"  label="Settings — Billing & invoices" width={APP_W} height={1100}><SettingsBilling /></DCArtboard>
+            <DCArtboard id="team"     label="Settings — Team & lead routing" width={APP_W} height={APP_H}><SettingsTeam /></DCArtboard>
+          </DCSection>
+
+          <DCSection id="end" title="07 · Buyer-facing configurator (embedded)"
+            subtitle="What end customers experience on the manufacturer's site.">
+            <DCArtboard id="step-dims" label="Embedded · Step 2 — dimensions" width={APP_W} height={1080}><EndUser1 /></DCArtboard>
+            <DCArtboard id="step-add"  label="Embedded · Step 6 — add-ons + summary" width={APP_W} height={1180}><EndUser2 /></DCArtboard>
+            <DCArtboard id="step-done" label="Embedded · Submitted — thank you" width={APP_W} height={1080}><EndUser3 /></DCArtboard>
+          </DCSection>
+
+          <DCSection id="modals" title="08 · Modals, popovers & toasts"
+            subtitle="Anything that floats over the app.">
+            <DCArtboard id="m-delete" label="Delete confirm" width={MODAL_W} height={MODAL_H}><ModalDelete /></DCArtboard>
+            <DCArtboard id="m-invite" label="Invite teammates" width={MODAL_W} height={MODAL_H}><ModalInvite /></DCArtboard>
+            <DCArtboard id="m-share"  label="Share & embed code" width={MODAL_W} height={MODAL_H}><ModalShare /></DCArtboard>
+            <DCArtboard id="m-up"     label="Upgrade plan" width={MODAL_W} height={MODAL_H}><ModalUpgrade /></DCArtboard>
+            <DCArtboard id="m-cmd"    label="Command palette · ⌘K" width={MODAL_W} height={MODAL_H}><ModalCmdK /></DCArtboard>
+            <DCArtboard id="m-quick"  label="Quick lead preview · slide-over" width={MODAL_W} height={MODAL_H}><ModalQuickLead /></DCArtboard>
+            <DCArtboard id="m-filter" label="Filter builder" width={MODAL_W} height={MODAL_H}><ModalFilter /></DCArtboard>
+            <DCArtboard id="m-notif"  label="Notifications stack" width={MODAL_W} height={MODAL_H}><ModalNotifs /></DCArtboard>
+            <DCArtboard id="m-empty"  label="Empty state — first lead" width={MODAL_W} height={MODAL_H}><ModalEmpty /></DCArtboard>
+          </DCSection>
+
+        </DesignCanvas>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

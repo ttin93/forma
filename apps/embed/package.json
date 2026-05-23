@@ -1,0 +1,21 @@
+{
+  "name": "@forma/embed",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --config vite.embed.config.ts && vite build",
+    "build:embed": "vite build --config vite.embed.config.ts",
+    "build:iframe": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@forma/configurator-engine": "workspace:*",
+    "@forma/types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vite": "^5.2.0"
+  }
+}

@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Forma — Claude Code Handoff Pack</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="tokens.css" />
+<style>
+  html, body { margin: 0; padding: 0; min-height: 100%; background: var(--c-bg); color: var(--c-text); font-family: var(--f-sans); }
+  body { display: flex; flex-direction: column; align-items: center; padding: 56px 32px 80px; }
+  .wrap { max-width: 1080px; width: 100%; }
+  h1 { font-size: 56px; font-weight: 500; letter-spacing: -0.03em; margin: 16px 0 0; line-height: 1; }
+  h2 { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; margin: 64px 0 16px; }
+  h3 { font-size: 14px; font-weight: 500; margin: 0 0 6px; }
+  p { font-size: 15px; color: var(--c-text-3); line-height: 1.55; margin: 0; }
+  .eyebrow { font-size: 11px; color: var(--c-muted); font-family: var(--f-mono); text-transform: uppercase; letter-spacing: 0.08em; }
+  .lead { font-size: 17px; line-height: 1.55; color: var(--c-text-2); max-width: 720px; margin-top: 20px; }
+  .serif { font-family: var(--f-serif); font-style: italic; font-weight: 400; }
+  .hr { height: 1px; background: var(--c-line); width: 100%; margin: 40px 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .card { display: flex; gap: 14px; padding: 20px; background: #fff; border: 1px solid var(--c-line); border-radius: var(--r-3); text-decoration: none; color: inherit; transition: border-color .15s, transform .15s; }
+  .card:hover { border-color: var(--c-line-3); }
+  .card .n { font-family: var(--f-mono); font-size: 11px; color: var(--c-muted); flex-shrink: 0; padding-top: 2px; min-width: 24px; }
+  .card .body { flex: 1; }
+  .card h3 { font-size: 15px; font-weight: 500; letter-spacing: -0.01em; }
+  .card p { font-size: 13px; line-height: 1.5; margin-top: 4px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; background: var(--c-surface); border: 1px solid var(--c-line); border-radius: 999px; font-size: 11.5px; font-family: var(--f-mono); color: var(--c-text-2); }
+  .pill .dot { width: 5px; height: 5px; border-radius: 5px; background: var(--c-ink); }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .step { display: grid; grid-template-columns: 32px 1fr; gap: 16px; padding: 16px 0; border-top: 1px solid var(--c-line); }
+  .step:first-of-type { border-top: 0; }
+  .step .num { font-family: var(--f-mono); font-size: 13px; color: var(--c-muted); padding-top: 2px; }
+  .step h3 { font-size: 15px; font-weight: 500; }
+  .step p { font-size: 13.5px; margin-top: 3px; }
+  code { font-family: var(--f-mono); font-size: 12.5px; background: var(--c-surface); border: 1px solid var(--c-line); padding: 1px 6px; border-radius: 4px; color: var(--c-text); }
+  .term { background: #0a0a0a; color: #e3e3e3; border-radius: var(--r-3); padding: 18px 20px; font-family: var(--f-mono); font-size: 12.5px; line-height: 1.65; overflow-x: auto; }
+  .term .c { color: #a3a3a3; }
+  .term .a { color: #fff; }
+  .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 24px 0; border-top: 1px solid var(--c-line); border-bottom: 1px solid var(--c-line); margin: 40px 0; }
+  .meta-grid .l { font-size: 10.5px; color: var(--c-muted); font-family: var(--f-mono); text-transform: uppercase; letter-spacing: 0.08em; }
+  .meta-grid .v { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; margin-top: 6px; }
+  .meta-grid .s { font-size: 11.5px; color: var(--c-text-3); font-family: var(--f-mono); margin-top: 3px; }
+  .footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--c-line); display: flex; justify-content: space-between; font-size: 11.5px; color: var(--c-muted); font-family: var(--f-mono); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+
+    <div class="row" style="justify-content: space-between;">
+      <span class="wordmark" style="font-size: 17px;">Forma<span class="dot" style="width: 6px; height: 6px; display: inline-block; background: #000; margin-left: 2px;"></span></span>
+      <div class="row" style="gap: 8px;">
+        <span class="pill"><span class="dot"></span>Spec v1.0</span>
+        <span class="pill">May 2026</span>
+      </div>
+    </div>
+
+    <div class="eyebrow" style="margin-top: 48px;">Claude Code · Handoff Pack</div>
+    <h1>
+      From this design<br/>to a <span class="serif">working&nbsp;product.</span>
+    </h1>
+    <p class="lead">
+      You have the design canvas. You have the technical spec. Together they are everything an engineer
+      (with Claude Code as pair) needs to ship Forma — the B2B configurator platform —
+      to a paid-customer-ready MVP in roughly five weeks.
+    </p>
+
+    <div class="meta-grid">
+      <div><div class="l">Spec documents</div><div class="v">10</div><div class="s">~50 KB total</div></div>
+      <div><div class="l">Design artboards</div><div class="v">29</div><div class="s">across 8 sections</div></div>
+      <div><div class="l">Phases to ship</div><div class="v">10</div><div class="s">acceptance-criteria gated</div></div>
+      <div><div class="l">Build estimate</div><div class="v">~5 wk</div><div class="s">solo dev + Claude Code</div></div>
+    </div>
+
+    <h2>What lives where</h2>
+    <p style="max-width: 720px;">
+      Two folders. The <em>design</em> is the visual contract — what every screen looks like.
+      The <em>spec</em> is the technical contract — how it works, what the data model is,
+      how money moves through it, how the embed talks to the parent page.
+    </p>
+
+    <div class="grid" style="margin-top: 20px;">
+      <a class="card" href="Forma — Full Application.html">
+        <div class="n">01</div>
+        <div class="body">
+          <h3>Design canvas</h3>
+          <p>29 artboards across marketing, auth, admin, end-user configurator, and modals. Pixel-perfect. The visual contract.</p>
+          <div class="pill" style="margin-top: 12px;">Forma — Full Application.html</div>
+        </div>
+      </a>
+      <a class="card" href="claude-code-spec/BRIEF.md">
+        <div class="n">02</div>
+        <div class="body">
+          <h3>Technical spec</h3>
+          <p>10 markdown files: data model, API, configurator JSON schema, embed protocol, billing, auth, phased roadmap.</p>
+          <div class="pill" style="margin-top: 12px;">claude-code-spec/</div>
+        </div>
+      </a>
+    </div>
+
+    <h2>The spec, file by file</h2>
+    <p style="max-width: 720px; margin-bottom: 20px;">Read these in this order. Each one is short and self-contained.</p>
+
+    <div class="grid">
+      <a class="card" href="claude-code-spec/BRIEF.md">
+        <div class="n">A</div>
+        <div class="body"><h3>BRIEF.md</h3><p>One-paragraph product, three audiences, non-negotiables, what "done" means.</p></div>
+      </a>
+      <a class="card" href="claude-code-spec/CLAUDE.md">
+        <div class="n">B</div>
+        <div class="body"><h3>CLAUDE.md</h3><p>Stack, code conventions, design tokens, folder layout, do's and don'ts.</p></div>
+      </a>
+      <a class="card" href="claude-code-spec/ARCHITECTURE.md">
+        <div class="n">C</div>
+        <div class="body"><h3>ARCHITECTURE.md</h3><p>Topology diagram, domains, environments, background jobs, what we don't use.</p></div>
+      </a>
+      <a class="card" href="claude-code-spec/DATA-MODEL.md">
+        <div class="n">D</div>
+        <div class="body"><h3>DATA-MODEL.md</h3><p>Every Postgres table, RLS policies, migrations rules. Source of truth.</p></div>
+      </a>
+      <a class="card" href="claude-code-spec/AUTH-MULTITENANT.md">
+        <div class="n">E</div>
+        <div class="body"><h3>AUTH-MULTITENANT.md</h3><p>Workspaces, roles, sessions, RLS tests, audit log, SSO stub.</p></div>
+      </a>
+      <a class="card" href="claude-code-spec/CONFIGURATOR-SCHEMA.md">
+        <div class="n">F</div>
+        <div class="body"><h3>CONFIGURATOR-SCHEMA.md</h3><p>The configurator JSON format, conditions, pricing formulas, evaluator API.</p></div>
+      </a>
+      <a class="card" href="claude-code-spec/EMBED-PROTOCOL.md">
+        <div class="n">G</div>
+        <div class="body"><h3>EMBED-PROTOCOL.md</h3><p>How embed.js boots, postMessage protocol, sandboxing, anti-abuse.</p></div>
+      </a>
+      <a class="card" href="claude-code-spec/API.md">
+        <div class="n">H</div>
+        <div class="body"><h3>API.md</h3><p>Every endpoint — admin REST, public embed, webhooks. Request/response shapes.</p></div>
+      </a>
+      <a class="card" href="claude-code-spec/INTEGRATIONS.md">
+        <div class="n">I</div>
+        <div class="body"><h3>INTEGRATIONS.md</h3><p>Stripe (billing), Resend (email), R2 (files), Turnstile, Pipedrive/Slack/Zapier.</p></div>
+      </a>
+      <a class="card" href="claude-code-spec/ROADMAP.md">
+        <div class="n">J</div>
+        <div class="body"><h3>ROADMAP.md</h3><p>10 build phases with acceptance criteria. Don't skip ahead.</p></div>
+      </a>
+    </div>
+
+    <h2>Hand it to Claude Code</h2>
+
+    <div style="margin-top: 8px;">
+      <div class="step">
+        <div class="num">01</div>
+        <div>
+          <h3>Spin up a new repo</h3>
+          <p>Don't build inside this design project. Create a fresh git repo for the codebase — keep design and code separate.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">02</div>
+        <div>
+          <h3>Move <code>CLAUDE.md</code> to repo root</h3>
+          <p>Copy the entire <code>claude-code-spec/</code> folder into the new repo, then move <code>CLAUDE.md</code> up to the root. Claude Code reads it automatically on every session.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">03</div>
+        <div>
+          <h3>Copy the design canvas alongside</h3>
+          <p>Put <code>Forma — Full Application.html</code> and its <code>.jsx</code> + <code>tokens.css</code> into a <code>design/</code> folder next to the spec. Claude Code reads both formats.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">04</div>
+        <div>
+          <h3>First prompt — ground it before coding</h3>
+          <div class="term" style="margin-top: 10px;">
+            <span class="c"># your first message to Claude Code</span><br/>
+            <span class="a">Read</span> CLAUDE.md and claude-code-spec/BRIEF.md first. Then open<br/>
+            design/Forma — Full Application.html so you understand the visual<br/>
+            language. <span class="a">Don't start coding yet</span> — give me a one-page summary of<br/>
+            what you understood and any blocking questions before we start<br/>
+            Phase 0 from claude-code-spec/ROADMAP.md.
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">05</div>
+        <div>
+          <h3>Go phase by phase</h3>
+          <p>Each phase in ROADMAP.md has acceptance criteria. After every phase, get a test report + a diff summary before moving on. Don't let it gallop ahead.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">06</div>
+        <div>
+          <h3>When the UI drifts — point at the canvas</h3>
+          <p>"Open <code>design/Forma — Full Application.html</code>, look at the <code>ConfigBuilder</code> artboard. The inspector has tabs Field / Pricing / Validation / Logic. Yours is missing Logic — fix it." Claude Code can read your JSX exactly.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">07</div>
+        <div>
+          <h3>When you need new screens — come back here</h3>
+          <p>If a flow turns out to need a screen the canvas doesn't cover (CSV import, error states, email templates), come back to this design tool. I'll add it to the canvas. You copy it into <code>design/</code> in the build repo. Claude Code implements.</p>
+        </div>
+      </div>
+    </div>
+
+    <h2>Honest expectations</h2>
+
+    <div class="grid-3">
+      <div style="padding: 18px; background: var(--c-surface); border: 1px solid var(--c-line); border-radius: var(--r-3);">
+        <div class="eyebrow">Phase 0–2</div>
+        <div style="font-size: 28px; font-weight: 500; letter-spacing: -0.02em; margin-top: 6px;">~1 week</div>
+        <p style="font-size: 12.5px; margin-top: 6px;">Scaffold, auth, configurator engine. Hardest spec, mostly mechanical code.</p>
+      </div>
+      <div style="padding: 18px; background: var(--c-surface); border: 1px solid var(--c-line); border-radius: var(--r-3);">
+        <div class="eyebrow">Phase 3–5</div>
+        <div style="font-size: 28px; font-weight: 500; letter-spacing: -0.02em; margin-top: 6px;">~2 weeks</div>
+        <p style="font-size: 12.5px; margin-top: 6px;">Embed runtime, lead inbox, visual builder. The product becomes real.</p>
+      </div>
+      <div style="padding: 18px; background: #0a0a0a; color: #fff; border-radius: var(--r-3);">
+        <div class="eyebrow" style="color: #a3a3a3;">Phase 6–10</div>
+        <div style="font-size: 28px; font-weight: 500; letter-spacing: -0.02em; margin-top: 6px;">~2 weeks</div>
+        <p style="font-size: 12.5px; margin-top: 6px; color: #a3a3a3;">Analytics, billing, team, marketing, polish, go-live. The boring 50%.</p>
+      </div>
+    </div>
+
+    <p style="margin-top: 28px; max-width: 720px; font-size: 14px; color: var(--c-text-3);">
+      <strong style="color: var(--c-ink); font-weight: 500;">Without specs this thorough,</strong> the same build is 10–12 weeks because half of it is the engineer guessing what you meant and rebuilding. With Claude Code reading clear contracts, you're shaving real time.
+    </p>
+
+    <h2>One more thing</h2>
+    <p style="max-width: 720px;">
+      As you build, anything Claude Code keeps getting wrong — uses the wrong library, sneaks <code>any</code> into TypeScript, puts logic in components — open <code>CLAUDE.md</code> and add a line under "DON'T". It re-reads that file every session. After a week the file will be tuned to your codebase and Claude Code will be borderline psychic.
+    </p>
+
+    <div class="footer">
+      <span>Forma · Configurator platform · Spec v1.0</span>
+      <span>Design + spec by you · build by Claude Code</span>
+    </div>
+
+  </div>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "forma",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @forma/db generate",
+    "db:migrate": "pnpm --filter @forma/db migrate",
+    "db:push": "pnpm --filter @forma/db push"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  }
+}

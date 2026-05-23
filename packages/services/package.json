@@ -1,0 +1,19 @@
+{
+  "name": "@forma/services",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@forma/db": "workspace:*",
+    "@forma/configurator-engine": "workspace:*",
+    "@forma/types": "workspace:*",
+    "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
