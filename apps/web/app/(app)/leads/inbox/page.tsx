@@ -1,81 +1,169 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/AppShell';
 import { Badge, Btn, Card } from '@/components/ui';
 
-const leads = [
-  { id: 'L-0234', name: 'Marko Novak', company: 'Novak d.o.o.', cfg: 'Pergola Classic', val: '€4,820', score: 87, status: 'new', hot: true, src: 'sunpergola.si', t: '2 min ago' },
-  { id: 'L-0233', name: 'Petra Kovač', company: 'Kovač Gradnje', cfg: 'Pergola Pro', val: '€7,140', score: 72, status: 'contacted', hot: false, src: 'google-ads', t: '1h ago' },
-  { id: 'L-0232', name: 'Andrej Zupan', company: 'Private', cfg: 'Pergola Classic', val: '€3,960', score: 61, status: 'qualified', hot: false, src: 'sunpergola.si', t: '3h ago' },
-  { id: 'L-0231', name: 'Maja Krajnc', company: 'Krajnc vrtnarstvo', cfg: 'Pergola XL', val: '€11,200', score: 95, status: 'quoted', hot: true, src: 'sunpergola.si/garden', t: '1d ago' },
-  { id: 'L-0230', name: 'Rok Horvat', company: 'RH Nepremičnine', cfg: 'Pergola Classic', val: '€4,380', score: 54, status: 'won', hot: false, src: 'facebook', t: '2d ago' },
-  { id: 'L-0229', name: 'Tina Bernik', company: 'Private', cfg: 'Pergola Mini', val: '€1,840', score: 32, status: 'lost', hot: false, src: 'sunpergola.si', t: '3d ago' },
-];
+type Contact = { name?: string; email?: string; company?: string };
 
-function ScorePill({ score }: { score: number }) {
+type Lead = {
+  id: string;
+  status: string;
+  hot: boolean | null;
+  score: number | null;
+  totalCents: number;
+  currency: string;
+  contact: Contact;
+  configuratorId: string;
+  source: string | null;
+  submittedAt: string;
+};
+
+const STATUS_OPTIONS = ['', 'new', 'contacted', 'qualified', 'quoted', 'won', 'lost', 'spam'];
+
+function ScorePill({ score }: { score: number | null }) {
+  const s = score ?? 0;
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 20, background: score >= 80 ? '#0a0a0a' : score >= 60 ? '#525252' : 'var(--color-surface)', color: score >= 60 ? '#fff' : 'var(--color-text-3)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, borderRadius: 3 }}>
-      {score}
+    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 20, background: s >= 80 ? '#0a0a0a' : s >= 60 ? '#525252' : 'var(--color-surface)', color: s >= 60 ? '#fff' : 'var(--color-text-3)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, borderRadius: 3 }}>
+      {s}
     </span>
   );
 }
 
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function fmtMoney(cents: number) {
+  return `€${(cents / 100).toLocaleString('en-EU', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+
 export default function LeadsInboxPage() {
+  const router = useRouter();
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams({ page: String(page), limit: '50' });
+    if (statusFilter) params.set('status', statusFilter);
+    if (q.trim()) params.set('q', q.trim());
+    const res = await fetch(`/api/v1/leads?${params}`);
+    if (res.ok) {
+      const json = await res.json();
+      setLeads(json.data ?? []);
+      setTotal(json.total ?? 0);
+    }
+    setLoading(false);
+  }, [page, statusFilter, q]);
+
+  useEffect(() => { load(); }, [load]);
+
+  function onSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setPage(1);
+    load();
+  }
+
+  const newCount = leads.filter(l => l.status === 'new').length;
+
   return (
     <div data-screen-label="Leads — Inbox">
       <PageHeader
         title="Leads"
         desc="All submissions from your embedded configurators."
         tabs={[
-          { label: 'Inbox', href: '/leads/inbox', count: 23 },
+          { label: 'Inbox', href: '/leads/inbox', count: total },
           { label: 'Pipeline', href: '/leads/pipeline' },
         ]}
         actions={
           <div style={{ display: 'flex', gap: 8 }}>
-            <Btn variant="secondary" size="sm">Filter</Btn>
-            <Btn variant="secondary" size="sm">Export CSV</Btn>
+            <form onSubmit={onSearch} style={{ display: 'flex', gap: 8 }}>
+              <input
+                value={q}
+                onChange={e => setQ(e.target.value)}
+                placeholder="Search by name or email…"
+                style={{ height: 32, padding: '0 10px', fontSize: 13, border: '1px solid var(--color-line-2)', borderRadius: 'var(--radius-2)', width: 220, outline: 'none' }}
+              />
+              <select
+                value={statusFilter}
+                onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+                style={{ height: 32, padding: '0 8px', fontSize: 13, border: '1px solid var(--color-line-2)', borderRadius: 'var(--radius-2)', background: '#fff', cursor: 'pointer' }}
+              >
+                {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s || 'All statuses'}</option>)}
+              </select>
+            </form>
           </div>
         }
       />
       <div style={{ padding: '20px 32px' }}>
         <Card pad={0}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--color-line)' }}>
-                {['', 'ID', 'Contact', 'Configurator', 'Value', 'Score', 'Status', 'Source', 'Time', ''].map((h, i) => (
-                  <th key={i} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, color: 'var(--color-muted)', fontFamily: 'var(--font-mono)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {leads.map((l, i) => (
-                <tr key={i} style={{ borderBottom: i < leads.length - 1 ? '1px solid var(--color-line)' : 'none', cursor: 'pointer' }}>
-                  <td style={{ padding: '12px 16px' }}>
-                    <input type="checkbox" style={{ margin: 0 }} />
-                  </td>
-                  <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--color-text-3)', whiteSpace: 'nowrap' }}>
-                    {l.id}
-                    {l.hot && <span style={{ marginLeft: 6, fontSize: 9, background: '#0a0a0a', color: '#fff', borderRadius: 3, padding: '1px 4px', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>HOT</span>}
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{l.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--color-text-3)' }}>{l.company}</div>
-                  </td>
-                  <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--color-text-2)' }}>{l.cfg}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{l.val}</td>
-                  <td style={{ padding: '12px 16px' }}><ScorePill score={l.score} /></td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <Badge kind={l.status === 'new' ? 'new' : l.status === 'won' ? 'live' : l.status === 'lost' ? 'off' : 'neutral'} size="sm">
-                      {l.status}
-                    </Badge>
-                  </td>
-                  <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--color-text-3)' }}>{l.src}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--color-text-3)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{l.t}</td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <Btn variant="ghost" size="sm">View →</Btn>
-                  </td>
+          {loading ? (
+            <div style={{ padding: 24, fontSize: 13, color: 'var(--color-muted)' }}>Loading…</div>
+          ) : leads.length === 0 ? (
+            <div style={{ padding: 48, textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>
+              {statusFilter || q ? 'No leads match your filters.' : 'No leads yet. Embed a configurator on your site to start receiving leads.'}
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--color-line)' }}>
+                  {['Contact', 'Value', 'Score', 'Status', 'Source', 'Time', ''].map((h, i) => (
+                    <th key={i} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, color: 'var(--color-muted)', fontFamily: 'var(--font-mono)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {leads.map((l, i) => (
+                  <tr
+                    key={l.id}
+                    style={{ borderBottom: i < leads.length - 1 ? '1px solid var(--color-line)' : 'none', cursor: 'pointer' }}
+                    onClick={() => router.push(`/leads/${l.id}`)}
+                  >
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{l.contact?.name ?? '—'}</div>
+                        {l.hot && <span style={{ fontSize: 9, background: '#0a0a0a', color: '#fff', borderRadius: 3, padding: '1px 4px', fontFamily: 'var(--font-mono)' }}>HOT</span>}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--color-text-3)' }}>{l.contact?.email ?? ''}</div>
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{fmtMoney(l.totalCents)}</td>
+                    <td style={{ padding: '12px 16px' }}><ScorePill score={l.score} /></td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <Badge kind={l.status === 'new' ? 'new' : l.status === 'won' ? 'live' : l.status === 'lost' ? 'off' : 'neutral'} size="sm">
+                        {l.status}
+                      </Badge>
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--color-text-3)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.source ?? '—'}</td>
+                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--color-text-3)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{timeAgo(l.submittedAt)}</td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <Btn variant="ghost" size="sm">View →</Btn>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {!loading && total > 50 && (
+            <div style={{ padding: '12px 20px', borderTop: '1px solid var(--color-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5, color: 'var(--color-text-3)' }}>
+              <span>Showing {leads.length} of {total}</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Btn variant="ghost" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>← Prev</Btn>
+                <Btn variant="ghost" size="sm" disabled={leads.length < 50} onClick={() => setPage(p => p + 1)}>Next →</Btn>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
     </div>

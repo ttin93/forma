@@ -1,4 +1,4 @@
-import { eq, and, desc, max } from 'drizzle-orm';
+import { eq, and, desc, max, sql } from 'drizzle-orm';
 import { configurators, configuratorVersions, configuratorDomains } from '@forma/db';
 import type { ConfiguratorSchema } from '@forma/types';
 import type { ServiceCtx } from './types';
@@ -174,7 +174,7 @@ export async function listConfigurators(ctx: ServiceCtx) {
       createdAt: configurators.createdAt,
     })
     .from(configurators)
-    .where(and(eq(configurators.workspaceId, ctx.workspaceId)))
+    .where(and(eq(configurators.workspaceId, ctx.workspaceId), sql`${configurators.archivedAt} IS NULL`))
     .orderBy(desc(configurators.createdAt));
 }
 
