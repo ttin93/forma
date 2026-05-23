@@ -3,6 +3,16 @@ import { getSession } from '@/lib/session';
 import { db } from '@/lib/db';
 import { getWorkspace, isWorkspaceActive } from '@forma/services';
 import { AppShell } from '@/components/AppShell';
+import { eq, and, count, sql } from 'drizzle-orm';
+import { leads, configurators } from '@forma/db';
+
+const PLAN_LIMITS: Record<string, { configurators: number; leads: number }> = {
+  trial:      { configurators: 1,  leads: 25   },
+  starter:    { configurators: 3,  leads: 200  },
+  growth:     { configurators: 10, leads: 1000 },
+  pro:        { configurators: 999, leads: 999999 },
+  enterprise: { configurators: 999, leads: 999999 },
+};
 
 export default async function AppLayout({
   children,
@@ -18,19 +28,32 @@ export default async function AppLayout({
   const ws = await getWorkspace({ db, workspaceId });
   if (!ws) redirect('/onboarding');
 
-  // Paywall: trial expired + no active subscription → force to billing
-  // (allow /settings/billing so the user can actually upgrade)
+  const [[cfgRow], [leadRow]] = await Promise.all([
+    db.select({ n: count() }).from(configurators).where(
+      and(eq(configurators.workspaceId, workspaceId), sql`${configurators.archivedAt} IS NULL`),
+    ),
+    db.select({ n: count() }).from(leads).where(
+      and(eq(leads.workspaceId, workspaceId), sql`${leads.deletedAt} IS NULL`),
+    ),
+  ]);
+
+  const limits = PLAN_LIMITS[ws.plan] ?? PLAN_LIMITS.trial;
+  const usage = {
+    configurators: Number(cfgRow?.n ?? 0),
+    leads: Number(leadRow?.n ?? 0),
+    limits,
+  };
+
   if (!isWorkspaceActive(ws)) {
-    // This check only runs for non-billing pages; billing page renders freely
     return (
-      <AppShell workspace={{ name: ws.name, plan: ws.plan, seats: ws.seats }}>
+      <AppShell workspace={{ name: ws.name, plan: ws.plan, seats: ws.seats }} usage={usage}>
         <PaywallBanner workspaceName={ws.name} />
       </AppShell>
     );
   }
 
   return (
-    <AppShell workspace={{ name: ws.name, plan: ws.plan, seats: ws.seats }}>
+    <AppShell workspace={{ name: ws.name, plan: ws.plan, seats: ws.seats }} usage={usage}>
       {children}
     </AppShell>
   );

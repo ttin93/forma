@@ -712,6 +712,34 @@ const FIELD_TYPES: { type: FieldType; label: string }[] = [
   { type: 'address',       label: 'Address' },
 ];
 
+// ── Getting started guide ──────────────────────────────────────────────────
+
+function GettingStarted({ onDismiss }: { onDismiss: () => void }) {
+  const steps = [
+    { n: '1', title: 'Add steps', desc: 'Steps = pages the customer fills out. E.g. "Model", "Dimensions", "Contact".' },
+    { n: '2', title: 'Add fields to each step', desc: 'Sliders, dropdowns, radio buttons, swatches… Click a field to edit its options.' },
+    { n: '3', title: 'Set up pricing rules', desc: 'Go to the Pricing tab. Add a base price, then conditional add-ons or multipliers.' },
+    { n: '4', title: 'Preview & Publish', desc: 'Use the Preview tab to test the flow. Hit Publish to make it live.' },
+  ];
+  return (
+    <div style={{ margin: '0 16px 12px', padding: '14px 16px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 'var(--radius-2)', position: 'relative' }}>
+      <button onClick={onDismiss} style={{ position: 'absolute', top: 10, right: 10, all: 'unset', cursor: 'pointer', color: '#64748b', fontSize: 16, lineHeight: 1 }}>×</button>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#0369a1', marginBottom: 10 }}>Getting started</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {steps.map(s => (
+          <div key={s.n} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#0369a1', color: '#fff', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>{s.n}</span>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#0c4a6e' }}>{s.title}</div>
+              <div style={{ fontSize: 11.5, color: '#0369a1', marginTop: 1 }}>{s.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 export function BuilderClient({
@@ -738,6 +766,7 @@ export function BuilderClient({
   });
 
   const [showAddField, setShowAddField] = useState(false);
+  const [showGuide, setShowGuide] = useState(() => initialSchema.steps.length === 0);
 
   const allFields = state.schema.steps.flatMap(s => s.fields);
   const selectedStep = state.schema.steps[state.selectedStepIdx];
@@ -832,8 +861,22 @@ export function BuilderClient({
         <div style={{ ...S.row, flex: 1 }}>
           {/* Steps column */}
           <div style={{ ...S.col(200), background: '#fff' }}>
-            <div style={S.secHead}>Steps</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 6px' }}>
+              <span style={S.secHead}>Steps</span>
+              <button
+                onClick={() => setShowGuide(v => !v)}
+                title="Getting started guide"
+                style={{ ...S.iconBtn, fontSize: 11, color: '#0369a1', fontFamily: 'var(--font-mono)' }}
+              >?</button>
+            </div>
+            {showGuide && <GettingStarted onDismiss={() => setShowGuide(false)} />}
             <div style={S.scroll}>
+              {state.schema.steps.length === 0 && (
+                <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--color-muted)', fontSize: 12.5 }}>
+                  No steps yet.<br />
+                  <span style={{ color: 'var(--color-text-3)' }}>Click "Add step" below to start.</span>
+                </div>
+              )}
               {state.schema.steps.map((step, i) => (
                 <div
                   key={step.id}
@@ -861,6 +904,11 @@ export function BuilderClient({
 
           {/* Fields column */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--color-surface)' }}>
+            {!selectedStep && (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-muted)', fontSize: 13, textAlign: 'center', padding: 32 }}>
+                Add a step on the left to begin
+              </div>
+            )}
             {selectedStep && (
               <>
                 <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--color-line)', background: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -868,8 +916,9 @@ export function BuilderClient({
                     style={{ ...S.inpSm, flex: 1, fontWeight: 500 }}
                     value={selectedStep.label}
                     onChange={e => dispatch({ type: 'UPDATE_STEP', idx: state.selectedStepIdx, patch: { label: e.target.value } })}
+                    placeholder="Step name (e.g. Dimensions)"
                   />
-                  <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{selectedStep.fields.length} fields</span>
+                  <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{selectedStep.fields.length} field{selectedStep.fields.length !== 1 ? 's' : ''}</span>
                 </div>
                 <div style={{ ...S.scroll, padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {selectedStep.fields.map(field => (
@@ -897,6 +946,12 @@ export function BuilderClient({
                       </div>
                     </div>
                   ))}
+
+                  {selectedStep.fields.length === 0 && !showAddField && (
+                    <div style={{ padding: '20px 8px', textAlign: 'center', color: 'var(--color-muted)', fontSize: 12.5 }}>
+                      No fields yet — click <strong>+ Add field</strong> below.
+                    </div>
+                  )}
 
                   {/* Add field */}
                   {showAddField ? (
@@ -946,10 +1001,13 @@ export function BuilderClient({
                 </div>
               </>
             ) : (
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
                 <div style={{ textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>
-                  <div style={{ fontSize: 24, marginBottom: 8 }}>←</div>
-                  Select a field to edit its properties
+                  <div style={{ fontSize: 20, marginBottom: 8, opacity: 0.4 }}>←</div>
+                  <div style={{ fontWeight: 500, color: 'var(--color-text-2)', marginBottom: 6 }}>No field selected</div>
+                  <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+                    Click any field in the middle column<br />to edit its label, options, and visibility.
+                  </div>
                 </div>
               </div>
             )}

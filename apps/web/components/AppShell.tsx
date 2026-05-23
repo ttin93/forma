@@ -4,6 +4,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Avatar, Icons, Wordmark } from './ui';
 
+interface Usage {
+  configurators: number;
+  leads: number;
+  limits: { configurators: number; leads: number };
+}
+
 function SideItem({ href, icon, children, badge }: {
   href: string;
   icon: React.ReactNode;
@@ -34,7 +40,40 @@ function SideItem({ href, icon, children, badge }: {
   );
 }
 
-function Sidebar({ workspace }: { workspace: { name: string; plan: string; seats: number } }) {
+function UsageBar({ label, used, limit }: { label: string; used: number; limit: number }) {
+  const unlimited = limit >= 999;
+  const pct = unlimited ? 0 : Math.min(100, Math.round((used / limit) * 100));
+  const warn = pct >= 80;
+  const barColor = pct >= 90 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#0a0a0a';
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+        <span style={{ color: 'var(--color-text-3)' }}>{label}</span>
+        <span style={{
+          fontFamily: 'var(--font-mono)',
+          color: warn ? barColor : 'var(--color-text-3)',
+          fontWeight: warn ? 600 : 400,
+        }}>
+          {unlimited ? `${used} / ∞` : `${used} / ${limit}`}
+        </span>
+      </div>
+      {!unlimited && (
+        <div style={{ height: 3, background: 'var(--color-line)', borderRadius: 3, overflow: 'hidden' }}>
+          <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: 3, transition: 'width .3s ease' }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Sidebar({ workspace, usage }: {
+  workspace: { name: string; plan: string; seats: number };
+  usage?: Usage;
+}) {
+  const planLabel = workspace.plan.charAt(0).toUpperCase() + workspace.plan.slice(1);
+  const isTrial = workspace.plan === 'trial';
+
   return (
     <aside style={{
       width: 232, flexShrink: 0, height: '100%',
@@ -53,7 +92,7 @@ function Sidebar({ workspace }: { workspace: { name: string; plan: string; seats
           <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{workspace.name}</div>
             <div style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>
-              {workspace.plan.charAt(0).toUpperCase() + workspace.plan.slice(1)} · {workspace.seats} seat{workspace.seats !== 1 ? 's' : ''}
+              {planLabel} · {workspace.seats} seat{workspace.seats !== 1 ? 's' : ''}
             </div>
           </div>
           <span style={{ color: 'var(--color-muted)', display: 'flex' }}>{Icons.chevD}</span>
@@ -62,8 +101,8 @@ function Sidebar({ workspace }: { workspace: { name: string; plan: string; seats
 
       <nav style={{ flex: 1, overflow: 'auto', padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
         <SideItem href="/dashboard" icon={Icons.home}>Dashboard</SideItem>
-        <SideItem href="/configurators" icon={Icons.cube} badge={4}>Configurators</SideItem>
-        <SideItem href="/leads" icon={Icons.inbox} badge={23}>Leads</SideItem>
+        <SideItem href="/configurators" icon={Icons.cube} badge={usage?.configurators}>Configurators</SideItem>
+        <SideItem href="/leads" icon={Icons.inbox} badge={usage?.leads}>Leads</SideItem>
         <SideItem href="/customers" icon={Icons.users}>Customers</SideItem>
         <SideItem href="/analytics" icon={Icons.chart}>Analytics</SideItem>
         <SideItem href="/embed" icon={Icons.code}>Embed & API</SideItem>
@@ -77,16 +116,21 @@ function Sidebar({ workspace }: { workspace: { name: string; plan: string; seats
       </nav>
 
       <div style={{ borderTop: '1px solid var(--color-line)', padding: 14 }}>
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-line)', borderRadius: 'var(--radius-2)', padding: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-ink)', marginBottom: 4 }}>
-            {workspace.plan.charAt(0).toUpperCase() + workspace.plan.slice(1)} · 73% of leads used
+        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-line)', borderRadius: 'var(--radius-2)', padding: '12px 12px 10px' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-ink)', marginBottom: 10 }}>
+            {planLabel} plan
           </div>
-          <div style={{ height: 4, background: 'var(--color-line)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
-            <div style={{ width: '73%', height: '100%', background: '#0a0a0a' }} />
-          </div>
-          <Link href="/settings/billing" style={{ fontSize: 11.5, color: 'var(--color-ink)', borderBottom: '1px solid currentColor', paddingBottom: 1 }}>
-            Upgrade plan →
-          </Link>
+          {usage && (
+            <>
+              <UsageBar label="Configurators" used={usage.configurators} limit={usage.limits.configurators} />
+              <UsageBar label="Leads" used={usage.leads} limit={usage.limits.leads} />
+            </>
+          )}
+          {isTrial && (
+            <Link href="/settings/billing" style={{ fontSize: 11.5, color: 'var(--color-ink)', borderBottom: '1px solid currentColor', paddingBottom: 1 }}>
+              Upgrade plan →
+            </Link>
+          )}
         </div>
       </div>
     </aside>
@@ -129,16 +173,17 @@ function TopBar({ crumb, actions }: { crumb?: string[]; actions?: React.ReactNod
   );
 }
 
-export function AppShell({ children, crumb, actions, workspace }: {
+export function AppShell({ children, crumb, actions, workspace, usage }: {
   children: React.ReactNode;
   crumb?: string[];
   actions?: React.ReactNode;
   workspace?: { name: string; plan: string; seats: number };
+  usage?: Usage;
 }) {
   const ws = workspace ?? { name: 'Workspace', plan: 'trial', seats: 1 };
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', background: 'var(--color-bg)', overflow: 'hidden' }}>
-      <Sidebar workspace={ws} />
+      <Sidebar workspace={ws} usage={usage} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <TopBar crumb={crumb} actions={actions} />
         <main style={{ flex: 1, overflow: 'auto', background: 'var(--color-surface)' }}>
