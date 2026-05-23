@@ -740,6 +740,324 @@ function GettingStarted({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
+// ── Simplified mode helpers ────────────────────────────────────────────────
+
+const FIELD_LABELS: Record<string, string> = {
+  'number-slider': 'Drsnik', 'number-input': 'Številka', 'text': 'Besedilo',
+  'email': 'E-pošta', 'phone': 'Telefon', 'select': 'Spustni seznam',
+  'multi-select': 'Večkratna izbira', 'radio': 'Radio gumbi', 'swatch': 'Barve',
+  'checkbox': 'Potrditveno polje', 'quantity': 'Količina',
+  'image-pick': 'Izbira slike', 'date': 'Datum', 'address': 'Naslov',
+};
+
+function conditionToText(cond: Condition | undefined, allFields: Field[]): string {
+  if (!cond) return 'vedno';
+  const lookup = (ref: string) => allFields.find(f => f.id === ref.replace(/^\$/, ''))?.label ?? ref.replace(/^\$/, '');
+  if ('eq' in cond)  { const [r, v] = (cond as { eq: [string, unknown] }).eq;  return `če ${lookup(r as string)} = ${v}`; }
+  if ('neq' in cond) { const [r, v] = (cond as { neq: [string, unknown] }).neq; return `če ${lookup(r as string)} ≠ ${v}`; }
+  if ('gt' in cond)  { const [r, v] = (cond as { gt: [string, unknown] }).gt;  return `če ${lookup(r as string)} > ${v}`; }
+  if ('gte' in cond) { const [r, v] = (cond as { gte: [string, unknown] }).gte; return `če ${lookup(r as string)} ≥ ${v}`; }
+  return 'posebni pogoj';
+}
+
+function formulaToText(formula: Formula): string {
+  if (typeof formula === 'number') return `€${formula}`;
+  if (typeof formula === 'object' && formula !== null) {
+    if ('area' in formula) return '= površina × cena';
+    if ('times' in formula) return '= izračun';
+    if ('ref' in formula) return '= vrednost polja';
+  }
+  return '= formula';
+}
+
+// ── Simplified field card ──────────────────────────────────────────────────
+
+function SimpleFieldCard({ field, stepIdx, dispatch }: {
+  field: Field; stepIdx: number; dispatch: React.Dispatch<Action>;
+}) {
+  const up = (patch: Partial<Field>) => dispatch({ type: 'UPDATE_FIELD', stepIdx, fieldId: field.id, patch });
+  const hasOpts = ['select', 'multi-select', 'radio', 'swatch', 'image-pick'].includes(field.type);
+  const opts = hasOpts ? ((field as Field & { options: (Option | SwatchOption)[] }).options ?? []) : [];
+
+  return (
+    <div style={{ padding: '12px 14px', background: '#fff', border: '1px solid var(--color-line)', borderRadius: 'var(--radius-2)', marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: (hasOpts || ['number-slider','number-input','quantity'].includes(field.type)) ? 10 : 0 }}>
+        <span style={{ ...S.chip, background: 'var(--color-surface-2)', flexShrink: 0 }}>{FIELD_LABELS[field.type] ?? field.type}</span>
+        <input
+          value={field.label}
+          onChange={e => up({ label: e.target.value })}
+          style={{ flex: 1, fontSize: 14, fontWeight: 500, border: 'none', outline: 'none', background: 'transparent', fontFamily: 'inherit' }}
+          placeholder="Ime polja…"
+        />
+        {field.required && <span style={{ fontSize: 10.5, color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>*</span>}
+        <button style={S.iconBtn} title="Izbriši" onClick={() => dispatch({ type: 'DELETE_FIELD', stepIdx, fieldId: field.id })}>{Icons.trash}</button>
+      </div>
+
+      {field.type === 'number-slider' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--color-text-3)' }}>
+          <span>od</span>
+          <input type="number" value={(field as Field & { min: number }).min} onChange={e => up({ min: Number(e.target.value) } as Partial<Field>)} style={{ ...S.inpSm, width: 60 }} />
+          <span>do</span>
+          <input type="number" value={(field as Field & { max: number }).max} onChange={e => up({ max: Number(e.target.value) } as Partial<Field>)} style={{ ...S.inpSm, width: 60 }} />
+          <span>enota</span>
+          <input value={(field as Field & { unit?: string }).unit ?? ''} onChange={e => up({ unit: e.target.value } as Partial<Field>)} style={{ ...S.inpSm, width: 44 }} placeholder="m" />
+        </div>
+      )}
+      {(field.type === 'number-input' || field.type === 'quantity') && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--color-text-3)' }}>
+          <span>od</span>
+          <input type="number" value={(field as Field & { min?: number }).min ?? 0} onChange={e => up({ min: Number(e.target.value) } as Partial<Field>)} style={{ ...S.inpSm, width: 60 }} />
+          <span>do</span>
+          <input type="number" value={(field as Field & { max?: number }).max ?? 100} onChange={e => up({ max: Number(e.target.value) } as Partial<Field>)} style={{ ...S.inpSm, width: 60 }} />
+        </div>
+      )}
+      {hasOpts && (
+        <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6 }}>
+          {opts.map((opt, i) => (
+            <div key={opt.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 6px 3px 8px', background: 'var(--color-surface)', border: '1px solid var(--color-line)', borderRadius: 4 }}>
+              {field.type === 'swatch' && (
+                <span style={{ width: 10, height: 10, borderRadius: 2, background: (opt as SwatchOption).color ?? '#888', flexShrink: 0 }} />
+              )}
+              <span style={{ fontSize: 12 }}>{opt.label}</span>
+              <button style={{ ...S.iconBtn, width: 14, height: 14 }} onClick={() => up({ options: opts.filter((_, j) => j !== i) } as Partial<Field>)}>×</button>
+            </div>
+          ))}
+          <button
+            style={{ padding: '3px 8px', border: '1px dashed var(--color-line-3)', borderRadius: 4, fontSize: 12, color: 'var(--color-text-3)', cursor: 'pointer', background: 'transparent' }}
+            onClick={() => {
+              const id = Math.random().toString(36).slice(2, 8);
+              const nOpt = field.type === 'swatch' ? { id, label: 'Nova barva', color: '#888888' } : { id, label: 'Nova možnost' };
+              up({ options: [...opts, nOpt] } as Partial<Field>);
+            }}
+          >+ Dodaj</button>
+        </div>
+      )}
+      {['text', 'email', 'phone', 'address', 'date'].includes(field.type) && (
+        <span style={{ fontSize: 12, color: 'var(--color-muted)', fontStyle: 'italic' }}>
+          Stranka {field.type === 'email' ? 'vpiše e-pošto' : field.type === 'phone' ? 'vpiše telefon' : field.type === 'address' ? 'vpiše naslov' : field.type === 'date' ? 'izbere datum' : 'vpiše besedilo'}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ── Simplified step section ────────────────────────────────────────────────
+
+function SimpleStepSection({ step, stepIdx, state, dispatch, isLast }: {
+  step: Step; stepIdx: number; state: BuilderState; dispatch: React.Dispatch<Action>; isLast: boolean;
+}) {
+  const [showAddField, setShowAddField] = useState(false);
+  return (
+    <section style={{ marginTop: 36 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 12 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-muted)', flexShrink: 0 }}>
+          {String(stepIdx + 1).padStart(2, '0')}
+        </span>
+        <input
+          value={step.label}
+          onChange={e => dispatch({ type: 'UPDATE_STEP', idx: stepIdx, patch: { label: e.target.value } })}
+          style={{ fontSize: 18, fontWeight: 500, letterSpacing: '-0.015em', border: 'none', outline: 'none', background: 'transparent', fontFamily: 'inherit', flex: 1 }}
+          placeholder="Ime koraka…"
+        />
+        <div style={{ display: 'flex', gap: 2 }}>
+          {stepIdx > 0 && <button style={S.iconBtn} onClick={() => dispatch({ type: 'MOVE_STEP', idx: stepIdx, dir: -1 })} title="Gor">↑</button>}
+          {!isLast && <button style={S.iconBtn} onClick={() => dispatch({ type: 'MOVE_STEP', idx: stepIdx, dir: 1 })} title="Dol">↓</button>}
+          {state.schema.steps.length > 1 && <button style={{ ...S.iconBtn, color: 'var(--color-text-3)' }} onClick={() => dispatch({ type: 'DELETE_STEP', idx: stepIdx })} title="Izbriši">×</button>}
+        </div>
+      </div>
+      <div style={{ marginLeft: 32 }}>
+        {step.fields.length === 0 && !showAddField && (
+          <div style={{ padding: '10px 0', fontSize: 13, color: 'var(--color-muted)', fontStyle: 'italic' }}>Brez polj — dodaj jih spodaj.</div>
+        )}
+        {step.fields.map(field => (
+          <SimpleFieldCard key={field.id} field={field} stepIdx={stepIdx} dispatch={dispatch} />
+        ))}
+        {showAddField ? (
+          <div style={{ border: '1px solid var(--color-line)', borderRadius: 'var(--radius-2)', background: '#fff', padding: 14, marginBottom: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 10, color: 'var(--color-text-2)' }}>Izberi tip polja</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+              {FIELD_TYPES.map(ft => (
+                <button key={ft.type} style={{ padding: '7px 8px', border: '1px solid var(--color-line)', borderRadius: 4, fontSize: 12, cursor: 'pointer', background: '#fff', fontFamily: 'inherit', textAlign: 'left' as const }}
+                  onClick={() => { dispatch({ type: 'ADD_FIELD', stepIdx, fieldType: ft.type }); setShowAddField(false); }}>
+                  {ft.label}
+                </button>
+              ))}
+            </div>
+            <button style={{ marginTop: 10, fontSize: 12, color: 'var(--color-text-3)', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setShowAddField(false)}>Prekliči</button>
+          </div>
+        ) : (
+          <button onClick={() => setShowAddField(true)}
+            style={{ fontSize: 13, color: 'var(--color-text-3)', background: 'none', border: '1px dashed var(--color-line-3)', borderRadius: 'var(--radius-2)', padding: '8px 14px', cursor: 'pointer', width: '100%', textAlign: 'left' as const }}>
+            + Dodaj polje
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ── Simplified pricing section ─────────────────────────────────────────────
+
+function SimplePricingSection({ rules, allFields, dispatch }: {
+  rules: PricingRule[]; allFields: Field[]; dispatch: React.Dispatch<Action>;
+}) {
+  const kindOpts: PricingRule['kind'][] = ['base', 'add', 'multiply', 'discount', 'vat'];
+  return (
+    <section style={{ marginTop: 40, paddingTop: 32, borderTop: '1px solid var(--color-line)' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 16 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-muted)' }}>€</span>
+        <h2 style={{ fontSize: 18, fontWeight: 500, letterSpacing: '-0.015em', margin: 0 }}>Cennik</h2>
+      </div>
+      <div style={{ marginLeft: 32, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {rules.length === 0 && (
+          <div style={{ padding: '10px 0', fontSize: 13, color: 'var(--color-muted)', fontStyle: 'italic' }}>Brez cenovnih pravil.</div>
+        )}
+        {rules.map(rule => (
+          <div key={rule.id} style={{ padding: '12px 14px', background: '#fff', border: '1px solid var(--color-line)', borderRadius: 'var(--radius-2)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ ...S.chip, background: '#0a0a0a', color: '#fff', border: 'none', flexShrink: 0 }}>{rule.kind}</span>
+            <div style={{ flex: 1, fontSize: 13.5 }}>
+              {rule.kind === 'base' && (
+                <span style={{ color: 'var(--color-text-2)' }}>
+                  Osnovna cena:&nbsp;
+                  <input type="number" style={{ ...S.inpSm, width: 80, display: 'inline-block' }}
+                    value={typeof rule.formula === 'number' ? rule.formula : ''}
+                    onChange={e => dispatch({ type: 'UPDATE_PRICING_RULE', id: rule.id, patch: { formula: Number(e.target.value) } as Partial<PricingRule> })} />
+                  &nbsp;€
+                </span>
+              )}
+              {rule.kind === 'vat' && (
+                <span style={{ color: 'var(--color-text-2)' }}>
+                  DDV:&nbsp;
+                  <input type="number" style={{ ...S.inpSm, width: 56, display: 'inline-block' }}
+                    value={Math.round(rule.rate * 100)}
+                    onChange={e => dispatch({ type: 'UPDATE_PRICING_RULE', id: rule.id, patch: { rate: Number(e.target.value) / 100 } as Partial<PricingRule> })} />
+                  &nbsp;%
+                </span>
+              )}
+              {(rule.kind === 'add' || rule.kind === 'discount') && (
+                <span>
+                  <span style={{ color: 'var(--color-text-3)', fontSize: 12.5 }}>{conditionToText(rule.when, allFields)}</span>
+                  {' → '}
+                  <span style={{ fontWeight: 500 }}>{rule.kind === 'discount' ? '−' : '+'}{formulaToText(rule.formula)}</span>
+                </span>
+              )}
+              {rule.kind === 'multiply' && (
+                <span>
+                  <span style={{ color: 'var(--color-text-3)', fontSize: 12.5 }}>{conditionToText(rule.when, allFields)}</span>
+                  {' → ×'}<span style={{ fontWeight: 500 }}>{rule.factor}</span>
+                </span>
+              )}
+            </div>
+            <input value={rule.label} onChange={e => dispatch({ type: 'UPDATE_PRICING_RULE', id: rule.id, patch: { label: e.target.value } as Partial<PricingRule> })}
+              placeholder="Oznaka…" style={{ ...S.inpSm, width: 120, fontSize: 11.5 }} />
+            <button style={S.iconBtn} onClick={() => dispatch({ type: 'DELETE_PRICING_RULE', id: rule.id })}>{Icons.trash}</button>
+          </div>
+        ))}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const, marginTop: 4 }}>
+          {kindOpts.map(k => (
+            <button key={k} onClick={() => dispatch({ type: 'ADD_PRICING_RULE', kind: k })}
+              style={{ padding: '5px 12px', border: '1px solid var(--color-line-2)', borderRadius: 'var(--radius-2)', fontSize: 12.5, cursor: 'pointer', background: '#fff', fontFamily: 'inherit', color: 'var(--color-text-2)' }}>
+              + {k === 'base' ? 'Osnovna cena' : k === 'add' ? 'Doplačilo' : k === 'discount' ? 'Popust' : k === 'multiply' ? 'Množilnik' : 'DDV'}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Simple mode full view ──────────────────────────────────────────────────
+
+function SimpleModeView({ state, dispatch, configuratorStatus }: {
+  state: BuilderState; dispatch: React.Dispatch<Action>; configuratorStatus: string;
+}) {
+  const allFields = state.schema.steps.flatMap(s => s.fields);
+  return (
+    <div style={{ flex: 1, overflowY: 'auto' as const, background: '#fff' }}>
+      <div style={{ maxWidth: 860, margin: '0 auto', padding: '32px 32px 100px' }}>
+        {/* Product title */}
+        <div style={{ paddingBottom: 24, borderBottom: '1px solid var(--color-line)', marginBottom: 8 }}>
+          <div style={{ fontSize: 10.5, color: 'var(--color-muted)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: 6 }}>
+            Vaš produkt
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              value={state.name}
+              onChange={e => dispatch({ type: 'SET_NAME', name: e.target.value })}
+              style={{ fontSize: 28, fontWeight: 500, letterSpacing: '-0.025em', border: 'none', outline: 'none', background: 'transparent', fontFamily: 'inherit', flex: 1 }}
+              placeholder="Ime vašega produkta…"
+            />
+            <span style={{
+              fontSize: 11, padding: '3px 8px', borderRadius: 4, fontFamily: 'var(--font-mono)', flexShrink: 0,
+              background: configuratorStatus === 'live' ? '#dcfce7' : 'var(--color-surface)',
+              color: configuratorStatus === 'live' ? '#16a34a' : 'var(--color-muted)',
+              border: `1px solid ${configuratorStatus === 'live' ? '#bbf7d0' : 'var(--color-line)'}`,
+            }}>
+              {configuratorStatus === 'live' ? '● Objavljeno' : configuratorStatus}
+            </span>
+          </div>
+        </div>
+
+        {/* Steps */}
+        {state.schema.steps.length === 0 && (
+          <div style={{ marginTop: 40, padding: '32px 0', textAlign: 'center' as const, color: 'var(--color-muted)', fontSize: 13 }}>
+            <div style={{ fontSize: 24, marginBottom: 10, opacity: 0.2 }}>+</div>
+            Začni z dodajanjem prvega koraka — npr. "Dimenzije", "Barve", "Streha", "Dodatki".
+          </div>
+        )}
+        {state.schema.steps.map((step, stepIdx) => (
+          <SimpleStepSection key={step.id} step={step} stepIdx={stepIdx} state={state} dispatch={dispatch}
+            isLast={stepIdx === state.schema.steps.length - 1} />
+        ))}
+        <div style={{ marginTop: 20, marginLeft: 32 }}>
+          <button onClick={() => dispatch({ type: 'ADD_STEP' })}
+            style={{ fontSize: 13, color: 'var(--color-text-2)', background: 'none', border: '1.5px dashed var(--color-line)', borderRadius: 'var(--radius-2)', padding: '10px 16px', cursor: 'pointer', width: '100%', textAlign: 'left' as const }}>
+            + Dodaj korak (npr. "Dimenzije", "Barve", "Streha", "Dodatki"…)
+          </button>
+        </div>
+
+        {/* Pricing */}
+        <SimplePricingSection rules={state.schema.pricing} allFields={allFields} dispatch={dispatch} />
+
+        {/* Advanced note */}
+        <details style={{ marginTop: 40, paddingTop: 24, borderTop: '1px solid var(--color-line)' }}>
+          <summary style={{ fontSize: 12.5, color: 'var(--color-text-3)', fontFamily: 'var(--font-mono)', cursor: 'pointer', listStyle: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Napredno · pogoji vidnosti, scoring, JSON
+          </summary>
+          <p style={{ marginTop: 10, fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
+            Preklopite na "Napredno" pogled z gumbom spodaj desno za dostop do naprednega urejevalnika.
+          </p>
+        </details>
+      </div>
+    </div>
+  );
+}
+
+// ── Mode toggle pill ───────────────────────────────────────────────────────
+
+function ModePill({ mode, onChange }: { mode: 'simple' | 'advanced'; onChange: (m: 'simple' | 'advanced') => void }) {
+  return (
+    <div style={{
+      position: 'fixed', bottom: 24, right: 28, zIndex: 50,
+      background: '#0a0a0a', padding: 3, borderRadius: 999,
+      display: 'inline-flex', boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+      fontSize: 12, fontWeight: 500,
+    }}>
+      {(['simple', 'advanced'] as const).map(k => (
+        <button key={k} onClick={() => onChange(k)} style={{
+          all: 'unset' as const, padding: '6px 14px', borderRadius: 999, cursor: 'pointer',
+          background: mode === k ? '#fff' : 'transparent',
+          color: mode === k ? '#0a0a0a' : '#a3a3a3',
+          transition: 'all .12s', fontFamily: 'var(--font-sans)',
+        }}>
+          {k === 'simple' ? 'Enostavno' : 'Napredno'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 export function BuilderClient({
@@ -768,6 +1086,7 @@ export function BuilderClient({
   const [showAddField, setShowAddField] = useState(false);
   const [showGuide, setShowGuide] = useState(() => initialSchema.steps.length === 0);
   const [upgradeInfo, setUpgradeInfo] = useState<{ message: string; limit: number } | null>(null);
+  const [simpleMode, setSimpleMode] = useState(true);
 
   const allFields = state.schema.steps.flatMap(s => s.fields);
   const selectedStep = state.schema.steps[state.selectedStepIdx];
@@ -838,22 +1157,24 @@ export function BuilderClient({
         </Badge>
         <div style={{ flex: 1 }} />
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 2, background: 'var(--color-surface)', border: '1px solid var(--color-line)', borderRadius: 'var(--radius-2)', padding: 2 }}>
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => dispatch({ type: 'SET_TAB', tab: t.id })}
-              style={{
-                all: 'unset', padding: '3px 12px', fontSize: 12.5, cursor: 'pointer', borderRadius: 3,
-                background: state.tab === t.id ? '#fff' : 'transparent',
-                color: state.tab === t.id ? 'var(--color-ink)' : 'var(--color-text-3)',
-                fontWeight: state.tab === t.id ? 500 : 400,
-                boxShadow: state.tab === t.id ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-              }}
-            >{t.label}</button>
-          ))}
-        </div>
+        {/* Tabs — only in advanced mode */}
+        {!simpleMode && (
+          <div style={{ display: 'flex', gap: 2, background: 'var(--color-surface)', border: '1px solid var(--color-line)', borderRadius: 'var(--radius-2)', padding: 2 }}>
+            {TABS.map(t => (
+              <button
+                key={t.id}
+                onClick={() => dispatch({ type: 'SET_TAB', tab: t.id })}
+                style={{
+                  all: 'unset', padding: '3px 12px', fontSize: 12.5, cursor: 'pointer', borderRadius: 3,
+                  background: state.tab === t.id ? '#fff' : 'transparent',
+                  color: state.tab === t.id ? 'var(--color-ink)' : 'var(--color-text-3)',
+                  fontWeight: state.tab === t.id ? 500 : 400,
+                  boxShadow: state.tab === t.id ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                }}
+              >{t.label}</button>
+            ))}
+          </div>
+        )}
 
         <div style={{ flex: 1 }} />
         {state.saveError && <span style={{ fontSize: 12, color: '#ef4444' }}>{state.saveError}</span>}
@@ -865,8 +1186,13 @@ export function BuilderClient({
         </Btn>
       </div>
 
-      {/* Content */}
-      {state.tab === 'fields' && (
+      {/* Simple mode */}
+      {simpleMode && (
+        <SimpleModeView state={state} dispatch={dispatch} configuratorStatus={configuratorStatus} />
+      )}
+
+      {/* Advanced content */}
+      {!simpleMode && state.tab === 'fields' && (
         <div style={{ ...S.row, flex: 1 }}>
           {/* Steps column */}
           <div style={{ ...S.col(200), background: '#fff' }}>
@@ -1024,19 +1350,19 @@ export function BuilderClient({
         </div>
       )}
 
-      {state.tab === 'pricing' && (
+      {!simpleMode && state.tab === 'pricing' && (
         <div style={{ ...S.scroll, padding: 0 }}>
           <PricingTab rules={state.schema.pricing} allFields={allFields} dispatch={dispatch} />
         </div>
       )}
 
-      {state.tab === 'scoring' && (
+      {!simpleMode && state.tab === 'scoring' && (
         <div style={{ ...S.scroll, padding: 0 }}>
           <ScoringTab rules={state.schema.scoring} allFields={allFields} dispatch={dispatch} />
         </div>
       )}
 
-      {state.tab === 'json' && (
+      {!simpleMode && state.tab === 'json' && (
         <div style={{ flex: 1, overflow: 'hidden', padding: 20, background: 'var(--color-surface)' }}>
           <textarea
             style={{
@@ -1051,6 +1377,9 @@ export function BuilderClient({
           />
         </div>
       )}
+
+      {/* Mode toggle pill */}
+      <ModePill mode={simpleMode ? 'simple' : 'advanced'} onChange={m => setSimpleMode(m === 'simple')} />
 
       {/* Upgrade modal */}
       {upgradeInfo && (
