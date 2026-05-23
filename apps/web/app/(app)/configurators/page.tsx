@@ -13,6 +13,7 @@ type Configurator = {
   status: string;
   liveVersionId: string | null;
   createdAt: string;
+  leadCount: number;
 };
 
 function slugify(str: string) {
@@ -111,9 +112,20 @@ export default function ConfiguratorsPage() {
                     </div>
                     <Badge kind={c.status === 'live' ? 'live' : 'neutral'} size="sm">{c.status}</Badge>
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  {c.leadCount > 0 && (
+                    <div style={{ fontSize: 12, color: 'var(--color-text-3)', fontFamily: 'var(--font-mono)' }}>
+                      {c.leadCount} lead{c.leadCount !== 1 ? 's' : ''}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <Link href={`/configurators/${c.id}/builder`} style={{ flex: 1 }}>
-                      <Btn variant="secondary" size="sm" full>Edit</Btn>
+                      <Btn variant="secondary" size="sm" full>Builder</Btn>
+                    </Link>
+                    <Link href={`/configurators/${c.id}/settings`}>
+                      <Btn variant="secondary" size="sm">Settings</Btn>
+                    </Link>
+                    <Link href={`/configurators/${c.id}/preview`}>
+                      <Btn variant="secondary" size="sm">Preview</Btn>
                     </Link>
                     <Btn variant="ghost" size="sm" disabled={deleting === c.id} onClick={() => deleteConfigurator(c.id, c.name)}>
                       {deleting === c.id ? '…' : 'Archive'}

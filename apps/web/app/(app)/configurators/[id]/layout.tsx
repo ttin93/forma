@@ -16,9 +16,12 @@ export default function ConfiguratorLayout({
   const pathname = usePathname();
   const base = `/configurators/${id}`;
 
+  const eyeIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
+
   const tabs = [
     { label: 'Builder', href: `${base}/builder`, icon: Icons.edit },
     { label: 'Settings', href: `${base}/settings`, icon: Icons.gear },
+    { label: 'Preview', href: `${base}/preview`, icon: eyeIcon },
   ];
 
   return (

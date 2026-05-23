@@ -33,6 +33,10 @@ function renderNumberSlider(field: Extract<Field, { type: 'number-slider' }>, va
   wrap.appendChild(labelEl(field.label, field.help));
 
   const row = el('div', 'f-slider-row');
+
+  const current = el('div', 'f-slider-current', `${v} ${field.unit}`);
+  row.appendChild(current);
+
   const input = el('input');
   input.type = 'range';
   input.min = String(field.min);
@@ -41,14 +45,15 @@ function renderNumberSlider(field: Extract<Field, { type: 'number-slider' }>, va
   input.value = String(v);
   input.className = 'f-slider';
 
-  const display = el('span', 'f-slider-val', `${v} ${field.unit}`);
+  const labels = el('div', 'f-slider-labels');
+  labels.innerHTML = `<span>${field.min} ${field.unit}</span><span>${field.max} ${field.unit}</span>`;
 
   input.addEventListener('input', () => {
-    display.textContent = `${input.value} ${field.unit}`;
+    current.textContent = `${input.value} ${field.unit}`;
     onChange(parseFloat(input.value));
   });
 
-  row.append(input, display);
+  row.append(input, labels);
   wrap.appendChild(row);
   return wrap;
 }
@@ -127,6 +132,7 @@ function renderRadio(field: Extract<Field, { type: 'radio' }>, value: unknown, o
     const name = el('span', 'f-radio-name', opt.label);
     btn.appendChild(name);
     if (opt.sublabel) btn.appendChild(el('span', 'f-radio-sub', opt.sublabel));
+    if (opt.price) btn.appendChild(el('span', 'f-radio-price', `+${formatPrice(opt.price.amount, opt.price.currency)}`));
     btn.addEventListener('click', () => {
       grid.querySelectorAll('.f-radio-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
@@ -244,22 +250,23 @@ function renderMultiSelect(field: Extract<Field, { type: 'multi-select' }>, valu
 
   const list = el('div', 'f-multi');
   for (const opt of (field.options as Option[])) {
-    const label = el('label', `f-multi-opt${selected.has(opt.id) ? ' checked' : ''}`);
-    const cb = el('input');
-    cb.type = 'checkbox';
-    cb.checked = selected.has(opt.id);
-    cb.addEventListener('change', () => {
-      if (cb.checked) {
-        selected.add(opt.id);
-        label.classList.add('checked');
-      } else {
+    const row = el('div', `f-multi-opt${selected.has(opt.id) ? ' checked' : ''}`);
+    const check = el('div', 'f-multi-check');
+    if (selected.has(opt.id)) check.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg>`;
+    row.addEventListener('click', () => {
+      if (selected.has(opt.id)) {
         selected.delete(opt.id);
-        label.classList.remove('checked');
+        row.classList.remove('checked');
+        check.innerHTML = '';
+      } else {
+        selected.add(opt.id);
+        row.classList.add('checked');
+        check.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg>`;
       }
       onChange(Array.from(selected));
     });
-    label.append(cb, el('span', undefined, opt.label));
-    list.appendChild(label);
+    row.append(check, el('span', undefined, opt.label));
+    list.appendChild(row);
   }
   wrap.appendChild(list);
   return wrap;
