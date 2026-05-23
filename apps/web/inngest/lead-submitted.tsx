@@ -10,9 +10,14 @@ import { Resend } from 'resend';
 import { eq, and } from 'drizzle-orm';
 import type { ConfiguratorSchema } from '@forma/types';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.RESEND_FROM ?? 'Forma <noreply@forma.studio>';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.forma.studio';
+
+function getResend() {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error('RESEND_API_KEY is not configured');
+  return new Resend(key);
+}
 
 export const onLeadSubmitted = inngest.createFunction(
   { id: 'on-lead-submitted', name: 'On lead submitted', triggers: [{ event: 'lead/submitted' }] },
@@ -66,7 +71,7 @@ export const onLeadSubmitted = inngest.createFunction(
 
     // ── 3. Buyer acknowledgement ──────────────────────────────────────
     await step.run('send-buyer-ack', async () => {
-      await resend.emails.send({
+      await getResend().emails.send({
         from: FROM,
         to: leadData.contact.email,
         subject: `Your ${schema?.name ?? 'enquiry'} — ${leadRef}`,
@@ -129,7 +134,7 @@ export const onLeadSubmitted = inngest.createFunction(
         }
       }
 
-      await resend.emails.send({
+      await getResend().emails.send({
         from: FROM,
         to: toEmail,
         subject: `${leadData.hot ? '🔥 HOT ' : ''}New lead — ${leadData.contact.name}`,
