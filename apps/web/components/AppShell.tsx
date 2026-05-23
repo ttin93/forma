@@ -112,6 +112,8 @@ function Sidebar({ workspace, usage }: {
         </div>
         <SideItem href="/settings/team" icon={Icons.users}>Team</SideItem>
         <SideItem href="/settings/billing" icon={Icons.credit}>Billing</SideItem>
+        <SideItem href="/settings/notifications" icon={Icons.bell}>Notifications</SideItem>
+        <SideItem href="/settings/security" icon={Icons.lock}>Security</SideItem>
         <SideItem href="/settings/workspace" icon={Icons.gear}>Settings</SideItem>
       </nav>
 

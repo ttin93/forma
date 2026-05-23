@@ -22,6 +22,7 @@ export async function GET() {
       brandPrimary: workspaces.brandPrimary,
       brandLogoUrl: workspaces.brandLogoUrl,
       brandFont: workspaces.brandFont,
+      notifEmailLead: workspaces.notifEmailLead,
       plan: workspaces.plan,
     })
     .from(workspaces)
@@ -41,6 +42,7 @@ const schema = z.object({
   currency: z.string().max(10).optional(),
   locale: z.string().max(20).optional(),
   timezone: z.string().max(60).optional(),
+  notifEmailLead: z.boolean().optional(),
 });
 
 export async function PATCH(req: NextRequest) {

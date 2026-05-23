@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, unique } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, unique } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: text('id').primaryKey(),
@@ -24,6 +24,7 @@ export const workspaces = pgTable('workspaces', {
   brandLogoUrl: text('brand_logo_url'),
   brandFont: text('brand_font'),
   customDomain: text('custom_domain'),
+  notifEmailLead: boolean('notif_email_lead').default(true).notNull(),
   plan: text('plan').default('trial').notNull(), // 'trial'|'growth'|'pro'|'expired'
   trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
   // Lemon Squeezy billing

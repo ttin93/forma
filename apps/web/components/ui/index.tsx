@@ -258,4 +258,5 @@ export const Icons = {
   trash:    <Icon d={<><path d="M4 7h16" /><path d="M9 7V4h6v3" /><path d="M6 7l1 13h10l1-13" /></>} />,
   filter:   <Icon d={<><path d="M3 5h18l-7 9v6l-4-2v-4z" /></>} />,
   download: <Icon d={<><path d="M12 3v14" /><path d="M6 11l6 6 6-6" /><path d="M4 21h16" /></>} />,
+  lock:     <Icon d={<><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>} />,
 };
