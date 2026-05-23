@@ -407,6 +407,29 @@ function DimensionsGroup({ cfg }: { cfg: PergolaConfig }) {
   );
 }
 
+// ── Camera view controller ─────────────────────────────────────────────────────
+
+export type CameraView = '3D' | 'Front' | 'Side' | 'Top';
+
+function CameraViewController({ view, size, W, L, H }: { view: CameraView; size: number; W: number; L: number; H: number }) {
+  const { camera } = useThree();
+  useEffect(() => {
+    const dist = Math.max(W, L, H) * 2.8;
+    const ty = H * 0.45;
+    const positions: Record<CameraView, [number, number, number]> = {
+      '3D':   [size * 0.95 * 2.2, size * 1.3, size * 0.85 * 2.2],
+      'Front':[0, H * 0.5, dist],
+      'Side': [dist, H * 0.5, 0],
+      'Top':  [0.001, dist * 1.5, 0.001],
+    };
+    const [px, py, pz] = positions[view];
+    camera.position.set(px, py, pz);
+    camera.lookAt(0, ty, 0);
+    camera.updateProjectionMatrix();
+  }, [view, camera, size, W, L, H]);
+  return null;
+}
+
 // ── AR/GLB exporter ───────────────────────────────────────────────────────────
 
 function SceneExporter({ exportRef }: { exportRef: React.MutableRefObject<(() => Promise<Blob>) | null> }) {
@@ -447,10 +470,11 @@ function PergolaScene({ cfg }: { cfg: PergolaConfig }) {
   );
 }
 
-export function Pergola3D({ cfg, style, exportRef }: {
+export function Pergola3D({ cfg, style, exportRef, cameraView = '3D' }: {
   cfg: PergolaConfig;
   style?: React.CSSProperties;
   exportRef?: React.MutableRefObject<(() => Promise<Blob>) | null>;
+  cameraView?: CameraView;
 }) {
   const W = cfg.width/100; const L = cfg.depth/100; const H = cfg.height/100;
   const size = Math.max(W, L, H);
@@ -462,9 +486,10 @@ export function Pergola3D({ cfg, style, exportRef }: {
       style={{ background: 'linear-gradient(175deg,#e8edf2 0%,#d6dde6 100%)', width: '100%', height: '100%', ...style }}
     >
       <PerspectiveCamera makeDefault position={[cam*0.95, size*1.3, cam*0.85]} fov={36} />
-      <OrbitControls enablePan={false} target={[0, H*0.45, 0]}
+      <OrbitControls enablePan={false} enabled={cameraView === '3D'} target={[0, H*0.45, 0]}
         minPolarAngle={0.1} maxPolarAngle={Math.PI/2.05}
         minDistance={size*1.0} maxDistance={size*5.5} />
+      <CameraViewController view={cameraView} size={size} W={W} L={L} H={H} />
       <ambientLight intensity={0.55} />
       <directionalLight position={[7,11,5]} intensity={1.6} castShadow
         shadow-mapSize={[2048,2048]}

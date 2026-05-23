@@ -4,7 +4,7 @@ import { use, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { evaluate } from '@forma/configurator-engine';
 import type { ConfiguratorSchema, Field, Step, EvaluateResult } from '@forma/types';
-import type { PergolaConfig, EnclosureType, EnclosureSegment } from '@/components/Pergola3D';
+import type { PergolaConfig, EnclosureType, EnclosureSegment, CameraView } from '@/components/Pergola3D';
 
 const Pergola3D = dynamic(
   () => import('@/components/Pergola3D').then(m => ({ default: m.Pergola3D })),
@@ -114,30 +114,49 @@ function postMsg(type: string, payload?: unknown) {
 // ── CSS injected once ─────────────────────────────────────────
 const CSS = `
 *,*::before,*::after{box-sizing:border-box}
-html,body{margin:0;padding:0;font-family:var(--fp,ui-sans-serif,system-ui,sans-serif);font-size:14px;color:#171717;background:#fff;line-height:1.5;-webkit-font-smoothing:antialiased}
-:root{--c:#0a0a0a;--cl:#ececec;--cl2:#e3e3e3;--cs:#fafafa;--ct:#737373;--cm:#a3a3a3;--r2:6px;--r3:10px}
-#forma-app{display:flex;flex-direction:column;min-height:100vh}
+html,body{margin:0;padding:0;font-family:var(--fp,ui-sans-serif,system-ui,sans-serif);font-size:14px;color:#171717;background:#f6f4ef;line-height:1.5;-webkit-font-smoothing:antialiased}
+:root{--c:#0a0a0a;--cl:#ececec;--cl2:#e3e3e3;--cs:#fafafa;--ct:#737373;--cm:#a3a3a3;--r2:6px;--r3:10px;--bg:#f6f4ef}
+#forma-app{display:flex;flex-direction:column;min-height:100vh;background:var(--bg)}
 /* Stepper */
-.fst{display:flex;align-items:center;padding:14px 32px;border-bottom:1px solid var(--cl);overflow-x:auto;scrollbar-width:none;background:#fff;flex-shrink:0}
-.fst::-webkit-scrollbar{display:none}
-.fss{display:flex;align-items:center;gap:7px;flex-shrink:0}
-.fsn{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;border:1px solid var(--cl2);background:#fff;color:var(--ct);transition:all .15s}
-.fss.done .fsn{background:#16a34a;border-color:#16a34a;color:#fff}
-.fss.active .fsn{background:var(--c);border-color:var(--c);color:#fff}
-.fsl{font-size:12.5px;color:var(--ct);white-space:nowrap;transition:color .15s}
-.fss.active .fsl{color:#171717;font-weight:500}
-.fsc{width:24px;height:1px;background:var(--cl2);flex-shrink:0;margin:0 3px}
-/* Body */
-.fbd{display:flex;flex:1;min-height:0}
-.f3d{flex:1.4;min-width:0;overflow:hidden;position:relative}
-.frpanel{flex:1;display:flex;min-width:0;min-height:0;overflow:hidden;max-width:560px}
-.fmn{flex:1;overflow-y:auto;padding:32px 40px 110px;min-width:0}
-.fsb{width:272px;flex-shrink:0;border-left:1px solid var(--cl);background:var(--cs);overflow-y:auto;padding:24px 20px;display:flex;flex-direction:column;gap:14px}
+.fst{padding:20px 32px 0;flex-shrink:0}
+.fst-row{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.fst-label{font-size:11px;font-family:ui-monospace,monospace;color:var(--cm);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;flex-shrink:0}
+.fst-bars{display:flex;gap:4px;flex:1}
+.fst-bar{flex:1;height:4px;border-radius:0;background:#e0ddd5;transition:background .2s}
+.fst-bar.done,.fst-bar.cur{background:#0a0a0a}
+.fst-exit{font-size:12px;color:#525252;border:none;border-bottom:1px solid #d4d4d4;background:none;cursor:pointer;padding:0;font-family:inherit;flex-shrink:0;white-space:nowrap}
+/* Main area */
+.fmain{flex:1;padding:0 32px 32px;overflow-y:auto;display:flex;flex-direction:column}
+/* Two-column grid */
+.fgrid{display:grid;grid-template-columns:1.2fr 1fr;gap:24px;align-items:start}
+.fgrid.no3d{grid-template-columns:1fr}
+/* 3D panel card */
+.f3d-card{background:#fff;border:1px solid var(--cl);border-radius:var(--r3);overflow:hidden;display:flex;flex-direction:column;position:sticky;top:0}
+.f3d-tabs{padding:10px 12px;display:flex;align-items:center;gap:4px;border-bottom:1px solid var(--cl)}
+.f3d-tab{padding:5px 11px;border-radius:4px;border:none;font-size:12.5px;cursor:pointer;font-family:inherit;transition:all .12s;background:transparent;color:#525252;line-height:1.4}
+.f3d-tab.act{background:#0a0a0a;color:#fff}
+.f3d-tab:hover:not(.act){background:var(--cs)}
+.f3d-canvas{position:relative;aspect-ratio:4/3;background:#fafafa;overflow:hidden}
+.f3d-area-bar{padding:11px 14px;border-top:1px solid var(--cl);display:flex;justify-content:space-between;align-items:center;font-size:12px;flex-shrink:0}
+.f3d-area-lbl{color:var(--cm)}
+.f3d-area-val{font-family:ui-monospace,monospace;color:#525252;font-size:12px}
+/* AR button (inside 3D panel tab bar) */
+.f3d-ar-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;background:rgba(10,10,10,.82);color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;backdrop-filter:blur(8px);transition:opacity .15s;letter-spacing:.01em;margin-left:auto}
+.f3d-ar-btn:hover:not(:disabled){opacity:.8}
+.f3d-ar-btn:disabled{opacity:.45;cursor:default}
+/* AR overlay */
+.f3d-ar-overlay{position:fixed;inset:0;z-index:9999;background:#111;display:flex;flex-direction:column}
+.f3d-ar-topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,.12);flex-shrink:0}
+.f3d-ar-title{font-size:14.5px;font-weight:500;color:#fff;letter-spacing:-.01em}
+.f3d-ar-close{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;font-family:inherit}
+.f3d-ar-hint{padding:10px 20px 14px;text-align:center;font-size:12px;color:#666;flex-shrink:0}
+/* Form column */
+.fform{display:flex;flex-direction:column;padding-top:4px}
 /* Step header */
-.fsh h2{font-size:22px;font-weight:600;letter-spacing:-.025em;margin:0 0 6px;line-height:1.2}
-.fsh p{font-size:14px;color:var(--ct);margin:0 0 24px}
+.fsh h2{font-size:22px;font-weight:500;letter-spacing:-.025em;margin:0 0 8px;line-height:1.25;color:#0a0a0a}
+.fsh p{font-size:14px;color:var(--ct);margin:0 0 24px;line-height:1.5}
 /* Fields */
-.ffl{display:flex;flex-direction:column;gap:20px;max-width:540px}
+.ffl{display:flex;flex-direction:column;gap:20px}
 .ffe{display:flex;flex-direction:column;gap:7px}
 .fla{font-size:13px;font-weight:500;color:#525252}
 .fhp{font-size:12px;color:var(--cm)}
@@ -167,7 +186,7 @@ input[type=range]::-webkit-slider-thumb{appearance:none;width:20px;height:20px;b
 .fsw:hover{transform:scale(1.1)}
 .fsw.act{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--c)}
 /* Checkbox */
-.fcw{display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:12px 14px;border:1px solid var(--cl2);border-radius:var(--r2);transition:border-color .15s}
+.fcw{display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:12px 14px;border:1px solid var(--cl2);border-radius:var(--r2);transition:border-color .15s;background:#fff}
 .fcw.act{border-color:var(--c)}
 .fck{width:18px;height:18px;accent-color:var(--c);cursor:pointer;flex-shrink:0;margin-top:1px}
 /* Multi-select */
@@ -188,49 +207,40 @@ input[type=range]::-webkit-slider-thumb{appearance:none;width:20px;height:20px;b
 .fib.act{border-color:var(--c);box-shadow:0 0 0 1px var(--c)}
 .fib img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
 .fib span{font-size:12px;color:#525252;text-align:center;padding:6px 8px}
-/* Pricing sidebar */
-.fpt{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;font-family:ui-monospace,monospace;color:var(--cm);margin-bottom:4px}
-.fptv{font-size:26px;font-weight:700;font-family:ui-monospace,monospace;letter-spacing:-.025em;line-height:1}
-.fpvat{font-size:11.5px;color:var(--cm);margin:4px 0 14px}
-.fpbd{display:flex;flex-direction:column;gap:7px;padding-top:12px;border-top:1px solid var(--cl)}
-.fpbr{display:flex;justify-content:space-between;font-size:13px;color:#525252;gap:8px}
-.fpbr.disc{color:#16a34a}
-.fpbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.fpba{font-family:ui-monospace,monospace;flex-shrink:0}
-.fpsb{display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding-top:10px;border-top:1px solid var(--cl);margin-top:4px}
-.fpsba{font-family:ui-monospace,monospace}
-/* Footer */
-.fft{position:fixed;bottom:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:14px 40px;background:#fff;border-top:1px solid var(--cl);gap:16px;z-index:20}
-.fpr{display:flex;flex-direction:column}
-.fprl{font-size:10.5px;color:var(--cm);text-transform:uppercase;letter-spacing:.06em;font-family:ui-monospace,monospace;line-height:1;margin-bottom:3px}
-.fprv{font-size:21px;font-weight:700;letter-spacing:-.025em;font-family:ui-monospace,monospace;line-height:1}
-.fprvat{font-size:11px;color:var(--cm);margin-top:2px}
+/* Price bar (floating sticky card) */
+.fprbar{position:sticky;bottom:16px;background:#fff;border:1px solid var(--cl);border-radius:var(--r3);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;margin-top:24px;box-shadow:0 4px 24px rgba(0,0,0,.08),0 1px 4px rgba(0,0,0,.04);z-index:10}
+.fprl{font-size:11px;font-family:ui-monospace,monospace;color:var(--cm);text-transform:uppercase;letter-spacing:.06em;line-height:1;margin-bottom:4px}
+.fprv{font-size:26px;font-weight:500;font-family:ui-monospace,monospace;letter-spacing:-.025em;line-height:1}
+.fprvat{font-size:11.5px;color:var(--ct);margin-top:4px}
 .fnv{display:flex;gap:8px;align-items:center}
 /* Buttons */
 .fbtn{display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:13.5px;font-weight:500;height:38px;padding:0 18px;border-radius:var(--r2);border:1px solid transparent;cursor:pointer;white-space:nowrap;transition:opacity .15s,background .15s}
 .fbtn:disabled{opacity:.45;cursor:default}
 .fbtn-p{background:var(--c);color:#fff;border-color:var(--c);font-size:14px;height:40px;padding:0 22px}
 .fbtn-p:hover:not(:disabled){opacity:.87}
-.fbtn-g{background:transparent;color:#525252;border-color:var(--cl2)}
+.fbtn-g{background:#fff;color:#525252;border-color:var(--cl2)}
 .fbtn-g:hover:not(:disabled){background:var(--cs)}
 /* Loading / Error */
 .fld{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 24px;gap:16px;color:var(--ct);flex:1}
 .fsp{width:28px;height:28px;border:2px solid var(--cl2);border-top-color:var(--c);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-/* Success */
-.fscs{flex:1;display:flex;flex-direction:column;align-items:center;padding:56px 32px 80px;max-width:620px;margin:0 auto;width:100%;text-align:center}
+/* Success screen */
+.fscs{flex:1;display:flex;flex-direction:column;align-items:center;padding:64px 32px 80px;max-width:640px;margin:0 auto;width:100%;text-align:center}
 .fsci{width:60px;height:60px;border-radius:50%;background:var(--c);color:#fff;font-size:30px;display:flex;align-items:center;justify-content:center;margin-bottom:22px}
-.fscs h2{font-size:24px;font-weight:600;letter-spacing:-.025em;margin:0 0 8px;line-height:1.2}
-.fscs p{font-size:14px;color:var(--ct);margin:0 0 8px;max-width:380px}
+.fscs h2{font-size:26px;font-weight:500;letter-spacing:-.03em;margin:0 0 10px;line-height:1.2}
+.fscs p{font-size:14px;color:var(--ct);margin:0 0 10px;max-width:400px;line-height:1.6}
 .fscr{font-family:ui-monospace,monospace;font-size:12px;color:var(--cm);background:var(--cs);border:1px solid var(--cl);border-radius:var(--r2);padding:5px 12px;margin-bottom:28px;letter-spacing:.04em}
-.fsnxt{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;margin-top:28px}
-.fsnc{padding:14px;border:1px solid var(--cl);border-radius:var(--r2);text-align:left}
-.fsnci{font-size:10.5px;font-family:ui-monospace,monospace;color:var(--cm);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
-.fsncT{font-size:13px;font-weight:500;margin-bottom:3px}
+.fsccard{padding:16px 20px;border:1px solid var(--cl);border-radius:var(--r3);margin-bottom:28px;width:100%;text-align:left;background:#fff}
+.fsccard-lbl{font-size:11px;color:var(--cm);font-family:ui-monospace,monospace;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.fsccard-val{font-size:26px;font-weight:500;font-family:ui-monospace,monospace;letter-spacing:-.02em}
+.fsnxt{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%}
+.fsnc{padding:16px;border:1px solid var(--cl);border-radius:var(--r3);text-align:left;background:#fff}
+.fsnci{font-size:10.5px;font-family:ui-monospace,monospace;color:var(--cm);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.fsncT{font-size:13px;font-weight:500;margin-bottom:4px}
 .fsncd{font-size:12px;color:var(--ct);line-height:1.4}
-.ferrbanner{padding:12px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:var(--r2);font-size:13px;color:#b91c1c;margin-bottom:18px}
+.ferrbanner{padding:12px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:var(--r2);font-size:13px;color:#b91c1c;margin-bottom:16px}
 /* Custom quote section */
-.fcqs{margin-top:24px;padding:20px;border:1px solid var(--cl2);border-radius:var(--r3);background:var(--cs)}
+.fcqs{margin-top:24px;padding:20px;border:1px solid var(--cl2);border-radius:var(--r3);background:#fff}
 .fcqs-h{display:flex;align-items:flex-start;gap:14px;margin-bottom:14px}
 .fcqs-icon{width:40px;height:40px;border-radius:50%;background:var(--c);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 .fcqs-title{font-size:15px;font-weight:600;margin:0 0 3px;letter-spacing:-.015em}
@@ -243,18 +253,8 @@ input[type=range]::-webkit-slider-thumb{appearance:none;width:20px;height:20px;b
 .fcqs-lbl{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid var(--cl2);border-radius:var(--r2);cursor:pointer;font-size:13px;color:#525252;background:#fff;transition:border-color .15s;font-family:inherit}
 .fcqs-lbl:hover{border-color:#d4d4d4}
 .fcqs-rm{font-size:12px;color:var(--cm);background:none;border:none;cursor:pointer;padding:4px 6px;font-family:inherit}
-/* AR viewer */
-.f3d-ar-btn{position:absolute;bottom:14px;right:14px;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(10,10,10,.78);color:#fff;border:none;border-radius:var(--r2);font-size:12.5px;font-weight:500;cursor:pointer;font-family:inherit;backdrop-filter:blur(8px);z-index:10;transition:opacity .15s;letter-spacing:.01em}
-.f3d-ar-btn:hover:not(:disabled){opacity:.82}
-.f3d-ar-btn:disabled{opacity:.5;cursor:default}
-.f3d-ar-btn-m{display:none}
-.f3d-ar-overlay{position:fixed;inset:0;z-index:9999;background:#111;display:flex;flex-direction:column}
-.f3d-ar-topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,.12);flex-shrink:0}
-.f3d-ar-title{font-size:14.5px;font-weight:500;color:#fff;letter-spacing:-.01em}
-.f3d-ar-close{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;font-family:inherit}
-.f3d-ar-hint{padding:10px 20px 14px;text-align:center;font-size:12px;color:#666;flex-shrink:0}
-@media(max-width:960px){.f3d{display:none!important}.frpanel{max-width:none!important;flex:1!important}.f3d-ar-btn-m{display:inline-flex}}
-@media(max-width:700px){.fsb{display:none}.fmn{padding:24px 20px 100px}.fft{padding:12px 20px}.fst{padding:12px 20px}.fsl{display:none}.fsnxt{grid-template-columns:1fr}.fscs{padding:40px 20px 80px}}
+@media(max-width:960px){.fgrid{grid-template-columns:1fr}.f3d-card{position:static}}
+@media(max-width:700px){.fmain{padding:0 16px 16px}.fst{padding:16px 16px 0}.fst-label{display:none}.fsnxt{grid-template-columns:1fr}.fscs{padding:40px 16px 80px}.fprbar{bottom:8px}}
 `;
 
 // ── Field renderer ────────────────────────────────────────────
@@ -410,6 +410,7 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
   const [customPhoto, setCustomPhoto] = useState<string | null>(null);
   const [arUrl, setArUrl] = useState<string | null>(null);
   const [arLoading, setArLoading] = useState(false);
+  const [cameraView, setCameraView] = useState<CameraView>('3D');
   const exportGlbRef = useRef<(() => Promise<Blob>) | null>(null);
   const styleRef = useRef(false);
 
@@ -428,7 +429,6 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
     fetch(`/api/v1/public/configurators/${id}${preview ? '?preview=1' : ''}`)
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then((d: PublicCfg) => {
-        // Apply branding CSS vars
         if (d.branding.primary) {
           document.documentElement.style.setProperty('--c', d.branding.primary);
         }
@@ -476,7 +476,7 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
       const text = await res.text();
       let json: Record<string, unknown> = {};
       try { if (text.trim()) json = JSON.parse(text); } catch { /* non-JSON body, use empty */ }
-      if (!res.ok) throw new Error(String(json.error ?? `Server error (${res.status})`))
+      if (!res.ok) throw new Error(String(json.error ?? `Server error (${res.status})`));
       setLeadRef(String(json.ref ?? ''));
       setSubmitted(true);
       postMsg('submitted', { leadRef: json.ref });
@@ -560,9 +560,9 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
           <p>Your quote request has been received. We&apos;ll get back to you with a personalised quote.</p>
           {leadRef && <div className="fscr">Ref: {leadRef}</div>}
           {total && (
-            <div style={{ padding: '14px 20px', border: '1px solid #ececec', borderRadius: 10, marginBottom: 24, width: '100%', textAlign: 'left' }}>
-              <div style={{ fontSize: 11, color: '#a3a3a3', fontFamily: 'ui-monospace,monospace', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>Your estimate</div>
-              <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'ui-monospace,monospace', letterSpacing: '-.02em' }}>{total}</div>
+            <div className="fsccard">
+              <div className="fsccard-lbl">Your estimate</div>
+              <div className="fsccard-val">{total}</div>
             </div>
           )}
           <div className="fsnxt">
@@ -585,50 +585,63 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
 
   const isLast = stepIdx === visibleSteps.length - 1;
   const pricing = result.pricing;
+  const areaM2 = (pergolaConfig.width / 100) * (pergolaConfig.depth / 100);
 
   // ── Main configurator ─────────────────────────────────────
   return (
     <div id="forma-app">
-      {/* Stepper */}
+
+      {/* Segment stepper */}
       {visibleSteps.length > 1 && (
         <div className="fst">
-          {visibleSteps.map((s, i) => (
-            <>
-              {i > 0 && <div key={`c${i}`} className="fsc" />}
-              <div key={s.id} className={`fss${i < stepIdx ? ' done' : i === stepIdx ? ' active' : ''}`}>
-                <div className="fsn">
-                  {i < stepIdx
-                    ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M4 12l5 5L20 6"/></svg>
-                    : i + 1}
-                </div>
-                <span className="fsl">{s.label}</span>
-              </div>
-            </>
-          ))}
+          <div className="fst-row">
+            <span className="fst-label">Step {stepIdx + 1} / {visibleSteps.length}</span>
+            <div className="fst-bars">
+              {visibleSteps.map((_, i) => (
+                <div key={i} className={`fst-bar${i < stepIdx ? ' done' : i === stepIdx ? ' cur' : ''}`} />
+              ))}
+            </div>
+            <button className="fst-exit">Save &amp; exit</button>
+          </div>
         </div>
       )}
 
-      {/* Body */}
-      <div className="fbd">
+      {/* Main content */}
+      <div className="fmain">
+        {submitErr && <div className="ferrbanner">{submitErr}</div>}
 
-        {/* 3D viewer — only for configurators with dimensional fields */}
-        {show3d && (
-          <div className="f3d">
-            <Pergola3D cfg={pergolaConfig} exportRef={exportGlbRef} />
-            <button className="f3d-ar-btn" onClick={handleAR} disabled={arLoading} title="Poglej pergolo v svojem prostoru">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
-              </svg>
-              {arLoading ? 'Pripravljam…' : 'Poglej v AR'}
-            </button>
-          </div>
-        )}
+        <div className={`fgrid${show3d ? '' : ' no3d'}`}>
 
-        {/* Form + pricing panel */}
-        <div className={show3d ? 'frpanel' : 'fbd'} style={show3d ? undefined : { flex: 1 }}>
-          <div className="fmn">
-            {submitErr && <div className="ferrbanner">{submitErr}</div>}
+          {/* 3D panel card */}
+          {show3d && (
+            <div className="f3d-card">
+              <div className="f3d-tabs">
+                {(['Front', 'Side', 'Top', '3D'] as CameraView[]).map(v => (
+                  <button key={v} className={`f3d-tab${cameraView === v ? ' act' : ''}`} onClick={() => setCameraView(v)}>
+                    {v}
+                  </button>
+                ))}
+                <button className="f3d-ar-btn" onClick={handleAR} disabled={arLoading} title="Poglej pergolo v svojem prostoru">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                  </svg>
+                  {arLoading ? 'Pripravljam…' : 'AR'}
+                </button>
+              </div>
+              <div className="f3d-canvas">
+                <Pergola3D cfg={pergolaConfig} exportRef={exportGlbRef} cameraView={cameraView} />
+              </div>
+              <div className="f3d-area-bar">
+                <span className="f3d-area-lbl">Area</span>
+                <span className="f3d-area-val">
+                  {(pergolaConfig.width / 100).toFixed(2)} × {(pergolaConfig.depth / 100).toFixed(2)} m = <strong>{areaM2.toFixed(2)} m²</strong>
+                </span>
+              </div>
+            </div>
+          )}
 
+          {/* Form column */}
+          <div className="fform">
             {currentStep && (
               <>
                 <div className="fsh">
@@ -699,60 +712,27 @@ export default function CustomerPage({ params }: { params: Promise<{ id: string 
               </>
             )}
           </div>
-
-          {/* Pricing sidebar */}
-          {pricing.total > 0 && (
-            <div className="fsb">
-              <div className="fpt">Estimated price</div>
-              <div className="fptv">{fmt(pricing.total, pricing.currency || schema.currency)}</div>
-              <div className="fpvat">{pricing.vat > 0 ? `incl. ${fmt(pricing.vat, pricing.currency || schema.currency)} VAT` : 'excl. VAT'}</div>
-              {pricing.breakdown.length > 0 && (
-                <div className="fpbd">
-                  {pricing.breakdown.map((item, i) => (
-                    <div key={i} className={`fpbr${item.kind === 'discount' ? ' disc' : ''}`}>
-                      <span className="fpbl">{item.label}</span>
-                      <span className="fpba">
-                        {item.kind === 'discount' ? '−' : ''}{fmt(Math.abs(item.amount), pricing.currency || schema.currency)}
-                      </span>
-                    </div>
-                  ))}
-                  <div className="fpsb">
-                    <span>Total</span>
-                    <span className="fpsba">{fmt(pricing.total, pricing.currency || schema.currency)}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
-      </div>
 
-      {/* Footer */}
-      <div className="fft">
-        <div className="fpr" id="fp-display">
-          <span className="fprl">Estimated price</span>
-          <span className="fprv">{pricing.total > 0 ? fmt(pricing.total, pricing.currency || schema.currency) : '—'}</span>
-          {pricing.vat > 0 && <span className="fprvat">incl. VAT</span>}
-        </div>
-        <div className="fnv">
-          {show3d && (
-            <button className="fbtn fbtn-g f3d-ar-btn-m" onClick={handleAR} disabled={arLoading} title="Poglej v AR">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
-              </svg>
-              {arLoading ? '…' : 'AR'}
-            </button>
-          )}
-          {stepIdx > 0 && (
-            <button className="fbtn fbtn-g" onClick={() => setStepIdx(i => i - 1)}>← Back</button>
-          )}
-          {isLast ? (
-            <button className="fbtn fbtn-p" disabled={submitting} onClick={handleSubmit}>
-              {submitting ? 'Sending…' : 'Get my quote →'}
-            </button>
-          ) : (
-            <button className="fbtn fbtn-p" onClick={() => setStepIdx(i => i + 1)}>Continue →</button>
-          )}
+        {/* Floating price bar */}
+        <div className="fprbar">
+          <div>
+            <div className="fprl">Running total · incl. VAT</div>
+            <div className="fprv">{pricing.total > 0 ? fmt(pricing.total, pricing.currency || schema.currency) : '—'}</div>
+            <div className="fprvat">Estimate — final quote arrives by email</div>
+          </div>
+          <div className="fnv">
+            {stepIdx > 0 && (
+              <button className="fbtn fbtn-g" onClick={() => setStepIdx(i => i - 1)}>← Back</button>
+            )}
+            {isLast ? (
+              <button className="fbtn fbtn-p" disabled={submitting} onClick={handleSubmit}>
+                {submitting ? 'Sending…' : 'Get my quote →'}
+              </button>
+            ) : (
+              <button className="fbtn fbtn-p" onClick={() => setStepIdx(i => i + 1)}>Continue →</button>
+            )}
+          </div>
         </div>
       </div>
 
