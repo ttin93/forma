@@ -977,7 +977,7 @@ function defaultPS(): PergolaSettings {
   return {
     basePrice: 8200, baseSqm: 12.0, pricePerSqm: 420,
     slats: { enabled: true },
-    dims: { enabled: true, minW: 2000, maxW: 8000, minD: 1500, maxD: 5000 },
+    dims: { enabled: true, minW: 2000, maxW: 8000, minD: 1500, maxD: 5000, minH: 200, maxH: 350 },
     walls: { enabled: true, discountPerWall: 60 },
     posts: { enabled: false, maxPerSide: 2, pricePerPost: 220 },
     colors: {
@@ -1100,6 +1100,8 @@ function PergolaTab({ schema, dispatch }: { schema: ConfiguratorSchema; dispatch
             <SRow label="Max. širina (mm)"><InlineNum value={ps.dims.maxW} onChange={v => set(['dims','maxW'], v)} max={15000} /></SRow>
             <SRow label="Min. globina (mm)"><InlineNum value={ps.dims.minD} onChange={v => set(['dims','minD'], v)} min={500} /></SRow>
             <SRow label="Max. globina (mm)"><InlineNum value={ps.dims.maxD} onChange={v => set(['dims','maxD'], v)} max={10000} /></SRow>
+            <SRow label="Min. višina (cm)"><InlineNum value={ps.dims.minH ?? 200} onChange={v => set(['dims','minH'], v)} min={150} max={400} /></SRow>
+            <SRow label="Max. višina (cm)"><InlineNum value={ps.dims.maxH ?? 350} onChange={v => set(['dims','maxH'], v)} min={150} max={500} /></SRow>
           </div>
         )}
       </div>

@@ -159,7 +159,7 @@ export interface PergolaSettings {
   baseSqm: number;
   pricePerSqm: number;
   slats: { enabled: boolean };
-  dims: { enabled: boolean; minW: number; maxW: number; minD: number; maxD: number };
+  dims: { enabled: boolean; minW: number; maxW: number; minD: number; maxD: number; minH: number; maxH: number };
   walls: { enabled: boolean; discountPerWall: number };
   posts: { enabled: boolean; maxPerSide: number; pricePerPost: number };
   colors: {

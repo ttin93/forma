@@ -102,7 +102,7 @@ function defaultPS(): PergolaSettings {
   return {
     basePrice: 8200, baseSqm: 12.0, pricePerSqm: 420,
     slats: { enabled: true },
-    dims:  { enabled: true, minW: 2000, maxW: 8000, minD: 1500, maxD: 5000 },
+    dims:  { enabled: true, minW: 2000, maxW: 8000, minD: 1500, maxD: 5000, minH: 200, maxH: 350 },
     walls: { enabled: true, discountPerWall: 60 },
     posts: { enabled: true, maxPerSide: 2, pricePerPost: 220 },
     colors: {
@@ -148,7 +148,7 @@ function defaultConfig(ps: PergolaSettings): PConfig {
   const addonQty: Record<string, number> = {};
   ps.addons.items.forEach(a => { addonQty[a.id] = a.minQty; });
   return {
-    width: 4000, depth: 3000, height: 240,
+    width: 4000, depth: 3000, height: 2400,
     slatsType: 'flat',
     houseWalls: { front: false, back: true, left: false, right: false },
     additionalPosts: {
@@ -303,7 +303,7 @@ function SlatsSection({ config, setConfig }: { config: PConfig; setConfig: (p: P
 }
 
 function DimsSection({ config, setConfig, ps }: { config: PConfig; setConfig: (p: Partial<PConfig>) => void; ps: PergolaSettings }) {
-  const { minW, maxW, minD, maxD } = ps.dims;
+  const { minW, maxW, minD, maxD, minH, maxH } = ps.dims;
   return (
     <div className="ps-section">
       <div className="ps-field">
@@ -323,6 +323,15 @@ function DimsSection({ config, setConfig, ps }: { config: PConfig; setConfig: (p
         <input type="range" className="ps-range" min={minD} max={maxD} step={50}
           value={config.depth} onChange={e => setConfig({ depth: +e.target.value })} />
         <div className="ps-range-bounds"><span>{(minD / 10).toFixed(0)} cm</span><span>{(maxD / 10).toFixed(0)} cm</span></div>
+      </div>
+      <div className="ps-field">
+        <div className="ps-field-row">
+          <label className="ps-label">Višina</label>
+          <span className="ps-val-badge">{(config.height / 10).toFixed(0)} cm</span>
+        </div>
+        <input type="range" className="ps-range" min={minH * 10} max={maxH * 10} step={10}
+          value={config.height} onChange={e => setConfig({ height: +e.target.value })} />
+        <div className="ps-range-bounds"><span>{minH} cm</span><span>{maxH} cm</span></div>
       </div>
     </div>
   );
