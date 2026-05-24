@@ -13,6 +13,8 @@ export type EnclosureType = 'none' | 'zip-screen' | 'movable-slats' | 'sliding-g
 export interface EnclosureSegment { type: EnclosureType; colorHex: string }
 export type SideEnclosureEntry = [EnclosureSegment, EnclosureSegment]
 
+export interface LEDSides { front: boolean; back: boolean; left: boolean; right: boolean }
+
 export interface PergolaConfig {
   width: number; depth: number; height: number;           // cm
   structureColor: string;                                  // hex
@@ -28,6 +30,11 @@ export interface PergolaConfig {
     front: SideEnclosureEntry; back: SideEnclosureEntry;
     left:  SideEnclosureEntry; right: SideEnclosureEntry;
   };
+  // Optional extras (from pergola configurator)
+  ledEdgeEnabled?: boolean;
+  ledEdgeSides?: LEDSides;
+  ledStructureEnabled?: boolean;
+  heatersEnabled?: boolean;
 }
 
 export const ENCLOSURE_TYPES: EnclosureType[] = [
@@ -430,6 +437,79 @@ function CameraViewController({ view, size, W, L, H }: { view: CameraView; size:
   return null;
 }
 
+// ── LED strips ────────────────────────────────────────────────────────────────
+
+function LEDStrips({ cfg }: { cfg: PergolaConfig }) {
+  const W = cfg.width / 100; const L = cfg.depth / 100; const H = cfg.height / 100;
+  const sides = cfg.ledEdgeSides ?? { front: true, back: true, left: true, right: true };
+  const ledMat = useMemo(() => new THREE.MeshStandardMaterial({
+    color: '#fff5c0', emissive: new THREE.Color('#fff5c0'), emissiveIntensity: 3, roughness: 0.2,
+  }), []);
+  const outerMat = useMemo(() => new THREE.MeshStandardMaterial({
+    color: '#ffe8a0', emissive: new THREE.Color('#ffe8a0'), emissiveIntensity: 2, roughness: 0.2,
+  }), []);
+  const y = H - BEAM_H * 0.35;
+  const yo = H - BEAM_H * 0.5;
+  const ow = OVERHANG;
+  return (
+    <group>
+      {/* Inner edge LED — under beam soffits */}
+      {cfg.ledEdgeEnabled && sides.front && (
+        <mesh position={[0, y, L/2 - ow - BEAM_W/2]} material={ledMat}>
+          <boxGeometry args={[W - ow*2, 0.014, 0.025]} />
+        </mesh>
+      )}
+      {cfg.ledEdgeEnabled && sides.back && (
+        <mesh position={[0, y, -(L/2 - ow - BEAM_W/2)]} material={ledMat}>
+          <boxGeometry args={[W - ow*2, 0.014, 0.025]} />
+        </mesh>
+      )}
+      {cfg.ledEdgeEnabled && sides.left && (
+        <mesh position={[-(W/2 - ow - BEAM_W/2), y, 0]} material={ledMat}>
+          <boxGeometry args={[0.025, 0.014, L - ow*2]} />
+        </mesh>
+      )}
+      {cfg.ledEdgeEnabled && sides.right && (
+        <mesh position={[W/2 - ow - BEAM_W/2, y, 0]} material={ledMat}>
+          <boxGeometry args={[0.025, 0.014, L - ow*2]} />
+        </mesh>
+      )}
+      {/* Outer structure LED — along outer edges of roof */}
+      {cfg.ledStructureEnabled && (
+        <>
+          <mesh position={[0, yo, L/2]} material={outerMat}><boxGeometry args={[W, 0.012, 0.02]} /></mesh>
+          <mesh position={[0, yo, -L/2]} material={outerMat}><boxGeometry args={[W, 0.012, 0.02]} /></mesh>
+          <mesh position={[-W/2, yo, 0]} material={outerMat}><boxGeometry args={[0.02, 0.012, L]} /></mesh>
+          <mesh position={[W/2, yo, 0]} material={outerMat}><boxGeometry args={[0.02, 0.012, L]} /></mesh>
+        </>
+      )}
+    </group>
+  );
+}
+
+// ── Infrared heaters ───────────────────────────────────────────────────────────
+
+function Heaters({ cfg }: { cfg: PergolaConfig }) {
+  if (!cfg.heatersEnabled) return null;
+  const W = cfg.width / 100; const H = cfg.height / 100;
+  const y = H - BEAM_H - 0.13;
+  const bodyMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#222', metalness: 0.8, roughness: 0.3 }), []);
+  const glowMat = useMemo(() => new THREE.MeshStandardMaterial({
+    color: '#ff6b00', emissive: new THREE.Color('#ff5500'), emissiveIntensity: 2.5,
+  }), []);
+  return (
+    <group>
+      {([-W/4, W/4] as number[]).map((x, i) => (
+        <group key={i} position={[x, y, 0]}>
+          <mesh material={bodyMat}><boxGeometry args={[0.82, 0.055, 0.115]} /></mesh>
+          <mesh position={[0, 0, 0.043]} material={glowMat}><boxGeometry args={[0.72, 0.025, 0.01]} /></mesh>
+          <pointLight position={[0, -0.12, 0]} color="#ff7040" intensity={0.6} distance={1.8} decay={2} />
+        </group>
+      ))}
+    </group>
+  );
+}
+
 // ── AR/GLB exporter ───────────────────────────────────────────────────────────
 
 function SceneExporter({ exportRef }: { exportRef: React.MutableRefObject<(() => Promise<Blob>) | null> }) {
@@ -460,6 +540,8 @@ function PergolaScene({ cfg }: { cfg: PergolaConfig }) {
         <RoofBeamsGroup cfg={cfg} />
         <LouversGroup cfg={cfg} />
         <SideEnclosureGroup cfg={cfg} />
+        <LEDStrips cfg={cfg} />
+        <Heaters cfg={cfg} />
       </group>
       <DimensionsGroup cfg={cfg} />
       <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, 0, 0]} receiveShadow>
