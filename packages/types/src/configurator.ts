@@ -132,6 +132,68 @@ export interface RoutingHints {
   defaultAssigneeId?: string;
 }
 
+// ─── Pergola Settings ─────────────────────────────────────────
+export interface PergolaEncType {
+  enabled: boolean;
+  priceBase: number;
+  pricePerM: number;
+}
+
+export interface PergolaAddonItem {
+  id: string;
+  title: string;
+  description: string;
+  unit: string;
+  pricePerUnit: number;
+  minQty: number;
+  maxQty: number;
+}
+
+export interface PergolaColorCat {
+  enabled: boolean;
+  surcharge: number;
+}
+
+export interface PergolaSettings {
+  basePrice: number;
+  baseSqm: number;
+  pricePerSqm: number;
+  slats: { enabled: boolean };
+  dims: { enabled: boolean; minW: number; maxW: number; minD: number; maxD: number };
+  walls: { enabled: boolean; discountPerWall: number };
+  posts: { enabled: boolean; maxPerSide: number; pricePerPost: number };
+  colors: {
+    enabled: boolean;
+    standard: PergolaColorCat;
+    ral: PergolaColorCat;
+    wood: PergolaColorCat;
+    special: PergolaColorCat;
+  };
+  enclosures: {
+    enabled: boolean;
+    zipScreen: PergolaEncType;
+    movableSlats: PergolaEncType;
+    slidingGlass: PergolaEncType;
+    fixedGlass: PergolaEncType;
+    ventPanel: PergolaEncType;
+    metalPanel: PergolaEncType;
+  };
+  lights: {
+    enabled: boolean;
+    ledEdge: { enabled: boolean; pricePerM: number };
+    ledStructure: { enabled: boolean; price: number };
+  };
+  electrical: {
+    enabled: boolean;
+    nello: { enabled: boolean; price: number };
+    somfy: { enabled: boolean; price: number };
+  };
+  addons: {
+    enabled: boolean;
+    items: PergolaAddonItem[];
+  };
+}
+
 // ─── Root Schema ─────────────────────────────────────────────
 export interface ConfiguratorSchema {
   version: 1;
@@ -144,6 +206,7 @@ export interface ConfiguratorSchema {
   scoring: ScoringRule[];
   routing?: RoutingHints;
   branding?: Branding;
+  pergolaSettings?: PergolaSettings;
 }
 
 // ─── Engine Output ───────────────────────────────────────────

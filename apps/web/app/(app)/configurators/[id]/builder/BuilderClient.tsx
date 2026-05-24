@@ -5,11 +5,12 @@ import { Badge, Btn, Card, Icons } from '@/components/ui';
 import type {
   ConfiguratorSchema, Step, Field, FieldType,
   PricingRule, ScoringRule, Condition, Formula, Option, SwatchOption,
+  PergolaSettings, PergolaAddonItem, PergolaEncType,
 } from '@forma/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type Tab = 'fields' | 'pricing' | 'scoring' | 'json';
+type Tab = 'fields' | 'pricing' | 'scoring' | 'json' | 'pergola';
 
 interface BuilderState {
   schema: ConfiguratorSchema;
@@ -43,6 +44,7 @@ type Action =
   | { type: 'DELETE_SCORING_RULE'; id: string }
   | { type: 'UPDATE_SCORING_RULE'; id: string; patch: Partial<ScoringRule> }
   | { type: 'SET_JSON'; raw: string }
+  | { type: 'SET_PERGOLA'; settings: PergolaSettings }
   | { type: 'REPLACE_STEPS'; steps: Step[] }
   | { type: 'REPLACE_PRICING'; rules: PricingRule[] }
   | { type: 'SET_SAVING'; value: boolean }
@@ -206,6 +208,7 @@ function reducer(state: BuilderState, action: Action): BuilderState {
       return dirty({ ...state, schema: { ...state.schema, steps: action.steps }, selectedStepIdx: 0, selectedFieldId: null });
     case 'REPLACE_PRICING':
       return dirty({ ...state, schema: { ...state.schema, pricing: action.rules } });
+    case 'SET_PERGOLA':   return dirty({ ...state, schema: { ...state.schema, pergolaSettings: action.settings } });
     case 'SET_SAVING':    return { ...state, saving: action.value };
     case 'SET_PUBLISHING':return { ...state, publishing: action.value };
     case 'SAVED':         return { ...state, dirty: false, saving: false, saveError: null };
@@ -968,6 +971,303 @@ function SimplePricingSection({ rules, allFields, dispatch }: {
   );
 }
 
+// ── Pergola Tab ───────────────────────────────────────────────────────────
+
+function defaultPS(): PergolaSettings {
+  return {
+    basePrice: 8200, baseSqm: 12.0, pricePerSqm: 420,
+    slats: { enabled: true },
+    dims: { enabled: true, minW: 2000, maxW: 8000, minD: 1500, maxD: 5000 },
+    walls: { enabled: true, discountPerWall: 60 },
+    posts: { enabled: false, maxPerSide: 2, pricePerPost: 220 },
+    colors: {
+      enabled: true,
+      standard: { enabled: true, surcharge: 0 },
+      ral: { enabled: true, surcharge: 180 },
+      wood: { enabled: true, surcharge: 340 },
+      special: { enabled: false, surcharge: 580 },
+    },
+    enclosures: {
+      enabled: true,
+      zipScreen:    { enabled: true,  priceBase: 360, pricePerM: 82 },
+      movableSlats: { enabled: true,  priceBase: 400, pricePerM: 98 },
+      slidingGlass: { enabled: true,  priceBase: 620, pricePerM: 140 },
+      fixedGlass:   { enabled: false, priceBase: 460, pricePerM: 108 },
+      ventPanel:    { enabled: false, priceBase: 320, pricePerM: 68 },
+      metalPanel:   { enabled: false, priceBase: 290, pricePerM: 60 },
+    },
+    lights: {
+      enabled: true,
+      ledEdge:      { enabled: true, pricePerM: 38 },
+      ledStructure: { enabled: true, price: 420 },
+    },
+    electrical: {
+      enabled: true,
+      nello: { enabled: false, price: 320 },
+      somfy: { enabled: true,  price: 520 },
+    },
+    addons: {
+      enabled: true,
+      items: [
+        { id: 'heating', title: 'Infrardeči grelec',   description: 'Stropni IR grelec za pergolo', unit: 'kos', pricePerUnit: 980, minQty: 1, maxQty: 4 },
+        { id: 'coating', title: 'Premium zaščitni premaz', description: 'Dodatna UV zaščita',       unit: 'kos', pricePerUnit: 210, minQty: 1, maxQty: 1 },
+        { id: 'snow',    title: 'Snežna zaščita',      description: 'Ojačitev za sneg',             unit: 'kos', pricePerUnit: 380, minQty: 1, maxQty: 1 },
+      ],
+    },
+  };
+}
+
+function PToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div
+      onClick={() => onChange(!checked)}
+      style={{ width: 36, height: 20, borderRadius: 10, cursor: 'pointer', flexShrink: 0, position: 'relative', transition: 'background .15s', background: checked ? '#0a0a0a' : '#d1d5db' }}
+    >
+      <div style={{ position: 'absolute', top: 3, left: checked ? 19 : 3, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
+    </div>
+  );
+}
+
+function PSH({ label, enabled, onToggle }: { label: string; enabled: boolean; onToggle: (v: boolean) => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: enabled ? '#f0faf0' : 'var(--color-surface)', borderBottom: '1px solid var(--color-line)' }}>
+      <PToggle checked={enabled} onChange={onToggle} />
+      <span style={{ fontSize: 13, fontWeight: 600, color: enabled ? 'var(--color-ink)' : 'var(--color-muted)' }}>{label}</span>
+    </div>
+  );
+}
+
+function PergolaTab({ schema, dispatch }: { schema: ConfiguratorSchema; dispatch: React.Dispatch<Action> }) {
+  const [ps, setPs] = useState<PergolaSettings>(() => (schema as ConfiguratorSchema & { pergolaSettings?: PergolaSettings }).pergolaSettings ?? defaultPS());
+
+  const update = useCallback((updater: (prev: PergolaSettings) => PergolaSettings) => {
+    setPs(prev => {
+      const next = updater(prev);
+      dispatch({ type: 'SET_PERGOLA', settings: next });
+      return next;
+    });
+  }, [dispatch]);
+
+  const set = useCallback((path: string[], value: unknown) => {
+    update(prev => {
+      const copy = JSON.parse(JSON.stringify(prev)) as Record<string, unknown>;
+      let obj = copy;
+      for (let i = 0; i < path.length - 1; i++) obj = obj[path[i]] as Record<string, unknown>;
+      obj[path[path.length - 1]] = value;
+      return copy as unknown as PergolaSettings;
+    });
+  }, [update]);
+
+  const addAddon = () => update(prev => ({
+    ...prev,
+    addons: { ...prev.addons, items: [...prev.addons.items, { id: Math.random().toString(36).slice(2), title: 'Nova opcija', description: '', unit: 'kos', pricePerUnit: 0, minQty: 0, maxQty: 1 }] },
+  }));
+  const updAddon = (id: string, patch: Partial<PergolaAddonItem>) => update(prev => ({
+    ...prev, addons: { ...prev.addons, items: prev.addons.items.map(a => a.id === id ? { ...a, ...patch } : a) },
+  }));
+  const delAddon = (id: string) => update(prev => ({
+    ...prev, addons: { ...prev.addons, items: prev.addons.items.filter(a => a.id !== id) },
+  }));
+
+  const ENC_ROWS: [keyof Omit<typeof ps.enclosures, 'enabled'>, string][] = [
+    ['zipScreen', 'ZIP Screen'], ['movableSlats', 'Premične lamele'], ['slidingGlass', 'Drsno steklo'],
+    ['fixedGlass', 'Fiksno steklo'], ['ventPanel', 'Ventilacijski panel'], ['metalPanel', 'Kovinski panel'],
+  ];
+
+  return (
+    <div style={{ ...S.scroll, padding: 0 }}>
+      {/* Base pricing */}
+      <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--color-line)' }}>
+        <div style={S.secHead}>Osnovna cena</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          <SRow label="Osnovna cena (€)"><InlineNum value={ps.basePrice} onChange={v => set(['basePrice'], v)} min={0} /></SRow>
+          <SRow label="Osnova m² (m²)"><InlineNum value={ps.baseSqm} onChange={v => set(['baseSqm'], v)} min={0} step={0.1} /></SRow>
+          <SRow label="€ / m² razlike"><InlineNum value={ps.pricePerSqm} onChange={v => set(['pricePerSqm'], v)} min={0} /></SRow>
+        </div>
+      </div>
+
+      {/* 1 Slats */}
+      <div style={{ borderBottom: '1px solid var(--color-line)' }}>
+        <PSH label="1. Tip lamel" enabled={ps.slats.enabled} onToggle={v => set(['slats','enabled'], v)} />
+      </div>
+
+      {/* 2 Dims */}
+      <div style={{ borderBottom: '1px solid var(--color-line)' }}>
+        <PSH label="2. Dimenzije" enabled={ps.dims.enabled} onToggle={v => set(['dims','enabled'], v)} />
+        {ps.dims.enabled && (
+          <div style={{ padding: '10px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <SRow label="Min. širina (mm)"><InlineNum value={ps.dims.minW} onChange={v => set(['dims','minW'], v)} min={500} /></SRow>
+            <SRow label="Max. širina (mm)"><InlineNum value={ps.dims.maxW} onChange={v => set(['dims','maxW'], v)} max={15000} /></SRow>
+            <SRow label="Min. globina (mm)"><InlineNum value={ps.dims.minD} onChange={v => set(['dims','minD'], v)} min={500} /></SRow>
+            <SRow label="Max. globina (mm)"><InlineNum value={ps.dims.maxD} onChange={v => set(['dims','maxD'], v)} max={10000} /></SRow>
+          </div>
+        )}
+      </div>
+
+      {/* 3 Walls */}
+      <div style={{ borderBottom: '1px solid var(--color-line)' }}>
+        <PSH label="3. Stene hiše" enabled={ps.walls.enabled} onToggle={v => set(['walls','enabled'], v)} />
+        {ps.walls.enabled && (
+          <div style={{ padding: '10px 14px' }}>
+            <SRow label="Popust na steno (€, pozitivno = odbitek)">
+              <InlineNum value={ps.walls.discountPerWall} onChange={v => set(['walls','discountPerWall'], v)} min={0} />
+            </SRow>
+          </div>
+        )}
+      </div>
+
+      {/* 4 Posts */}
+      <div style={{ borderBottom: '1px solid var(--color-line)' }}>
+        <PSH label="4. Dodatni stebri" enabled={ps.posts.enabled} onToggle={v => set(['posts','enabled'], v)} />
+        {ps.posts.enabled && (
+          <div style={{ padding: '10px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <SRow label="Max. stebrov/stranico"><InlineNum value={ps.posts.maxPerSide} onChange={v => set(['posts','maxPerSide'], v)} min={1} max={5} /></SRow>
+            <SRow label="Cena/steber (€)"><InlineNum value={ps.posts.pricePerPost} onChange={v => set(['posts','pricePerPost'], v)} min={0} /></SRow>
+          </div>
+        )}
+      </div>
+
+      {/* 5 Colors */}
+      <div style={{ borderBottom: '1px solid var(--color-line)' }}>
+        <PSH label="5. Barve" enabled={ps.colors.enabled} onToggle={v => set(['colors','enabled'], v)} />
+        {ps.colors.enabled && (
+          <div style={{ padding: '10px 14px' }}>
+            {(['standard','ral','wood','special'] as const).map(cat => {
+              const labels = { standard: 'Standard', ral: 'RAL', wood: 'Les', special: 'Special' };
+              return (
+                <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <PToggle checked={ps.colors[cat].enabled} onChange={v => set(['colors', cat, 'enabled'], v)} />
+                  <span style={{ fontSize: 12.5, width: 65 }}>{labels[cat]}</span>
+                  <span style={{ fontSize: 11.5, color: 'var(--color-text-3)', flex: 1 }}>Doplačilo (€):</span>
+                  <input type="number" style={{ ...S.inpSm, width: 80 }} value={ps.colors[cat].surcharge}
+                    onChange={e => set(['colors', cat, 'surcharge'], Number(e.target.value))} min={0} />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 6 Enclosures */}
+      <div style={{ borderBottom: '1px solid var(--color-line)' }}>
+        <PSH label="6. Bočne zapore" enabled={ps.enclosures.enabled} onToggle={v => set(['enclosures','enabled'], v)} />
+        {ps.enclosures.enabled && (
+          <div style={{ padding: '10px 14px' }}>
+            {ENC_ROWS.map(([key, label]) => {
+              const enc = ps.enclosures[key] as PergolaEncType;
+              return (
+                <div key={key} style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <PToggle checked={enc.enabled} onChange={v => set(['enclosures', key, 'enabled'], v)} />
+                    <span style={{ fontSize: 12.5, fontWeight: 500 }}>{label}</span>
+                  </div>
+                  {enc.enabled && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, paddingLeft: 44 }}>
+                      <SRow label="Osnovna cena (€)"><InlineNum value={enc.priceBase} onChange={v => set(['enclosures', key, 'priceBase'], v)} min={0} /></SRow>
+                      <SRow label="Cena / meter (€)"><InlineNum value={enc.pricePerM} onChange={v => set(['enclosures', key, 'pricePerM'], v)} min={0} /></SRow>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 7 Lights */}
+      <div style={{ borderBottom: '1px solid var(--color-line)' }}>
+        <PSH label="7. Razsvetljava" enabled={ps.lights.enabled} onToggle={v => set(['lights','enabled'], v)} />
+        {ps.lights.enabled && (
+          <div style={{ padding: '10px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <PToggle checked={ps.lights.ledEdge.enabled} onChange={v => set(['lights','ledEdge','enabled'], v)} />
+              <span style={{ fontSize: 12.5, fontWeight: 500, flex: 1 }}>LED rob (notranji)</span>
+            </div>
+            {ps.lights.ledEdge.enabled && (
+              <div style={{ paddingLeft: 44, marginBottom: 8 }}>
+                <SRow label="Cena €/meter"><InlineNum value={ps.lights.ledEdge.pricePerM} onChange={v => set(['lights','ledEdge','pricePerM'], v)} min={0} /></SRow>
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <PToggle checked={ps.lights.ledStructure.enabled} onChange={v => set(['lights','ledStructure','enabled'], v)} />
+              <span style={{ fontSize: 12.5, fontWeight: 500, flex: 1 }}>LED zunanja konstrukcija</span>
+            </div>
+            {ps.lights.ledStructure.enabled && (
+              <div style={{ paddingLeft: 44 }}>
+                <SRow label="Fiksna cena (€)"><InlineNum value={ps.lights.ledStructure.price} onChange={v => set(['lights','ledStructure','price'], v)} min={0} /></SRow>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 8 Electrical */}
+      <div style={{ borderBottom: '1px solid var(--color-line)' }}>
+        <PSH label="8. Električni paket" enabled={ps.electrical.enabled} onToggle={v => set(['electrical','enabled'], v)} />
+        {ps.electrical.enabled && (
+          <div style={{ padding: '10px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <PToggle checked={ps.electrical.nello.enabled} onChange={v => set(['electrical','nello','enabled'], v)} />
+              <span style={{ fontSize: 12.5, fontWeight: 500, flex: 1 }}>Nello Smart Motor</span>
+              {ps.electrical.nello.enabled && (
+                <input type="number" style={{ ...S.inpSm, width: 80 }} value={ps.electrical.nello.price}
+                  onChange={e => set(['electrical','nello','price'], Number(e.target.value))} min={0} />
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <PToggle checked={ps.electrical.somfy.enabled} onChange={v => set(['electrical','somfy','enabled'], v)} />
+              <span style={{ fontSize: 12.5, fontWeight: 500, flex: 1 }}>Somfy Motorization</span>
+              {ps.electrical.somfy.enabled && (
+                <input type="number" style={{ ...S.inpSm, width: 80 }} value={ps.electrical.somfy.price}
+                  onChange={e => set(['electrical','somfy','price'], Number(e.target.value))} min={0} />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 9 Addons */}
+      <div>
+        <PSH label="9. Dodatki" enabled={ps.addons.enabled} onToggle={v => set(['addons','enabled'], v)} />
+        {ps.addons.enabled && (
+          <div style={{ padding: '10px 14px' }}>
+            {ps.addons.items.map((item, idx) => (
+              <div key={item.id} style={{ border: '1px solid var(--color-line)', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-3)' }}>Dodatek #{idx + 1}</span>
+                  <button onClick={() => delAddon(item.id)} style={{ ...S.iconBtn, color: '#ef4444', fontSize: 14 }}>✕</button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <SRow label="Naziv">
+                    <input style={S.inp} value={item.title} onChange={e => updAddon(item.id, { title: e.target.value })} />
+                  </SRow>
+                  <SRow label="Enota (kos, m², ...)">
+                    <input style={S.inp} value={item.unit} onChange={e => updAddon(item.id, { unit: e.target.value })} />
+                  </SRow>
+                </div>
+                <SRow label="Opis">
+                  <input style={S.inp} value={item.description} onChange={e => updAddon(item.id, { description: e.target.value })} />
+                </SRow>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                  <SRow label="Cena / enoto (€)"><InlineNum value={item.pricePerUnit} onChange={v => updAddon(item.id, { pricePerUnit: v })} min={0} /></SRow>
+                  <SRow label="Min. količina"><InlineNum value={item.minQty} onChange={v => updAddon(item.id, { minQty: v })} min={0} /></SRow>
+                  <SRow label="Max. količina"><InlineNum value={item.maxQty} onChange={v => updAddon(item.id, { maxQty: v })} min={1} /></SRow>
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={addAddon}
+              style={{ width: '100%', padding: '8px', border: '1px dashed var(--color-line-2)', borderRadius: 6, background: 'none', cursor: 'pointer', fontSize: 12.5, color: 'var(--color-text-3)' }}
+            >
+              + Dodaj dodatek
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Simple mode full view ──────────────────────────────────────────────────
 
 function SimpleModeView({ state, dispatch, configuratorStatus }: {
@@ -1642,6 +1942,7 @@ export function BuilderClient({
     { id: 'pricing', label: 'Pricing' },
     { id: 'scoring', label: 'Scoring' },
     { id: 'json', label: 'JSON' },
+    { id: 'pergola', label: 'Pergola' },
   ];
 
   return (
@@ -1902,6 +2203,10 @@ export function BuilderClient({
             spellCheck={false}
           />
         </div>
+      )}
+
+      {!simpleMode && state.tab === 'pergola' && (
+        <PergolaTab schema={state.schema} dispatch={dispatch} />
       )}
 
         </div>{/* end editor column */}
